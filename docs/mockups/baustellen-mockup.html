@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baustellen — TimeTracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #111;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    gap: 16px;
+  }
+
+  .page-title {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .page-title h1 {
+    font-size: 26px; font-weight: 900; color: #fff; letter-spacing: -0.02em;
+  }
+  .page-title h1 span { color: #E8722A; }
+  .page-title p { font-size: 13px; color: rgba(255,255,255,0.35); margin-top: 4px; }
+
+  /* TAB SWITCHER */
+  .tab-bar {
+    display: flex; gap: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 4px;
+  }
+  .tab-btn {
+    padding: 8px 20px; border-radius: 9px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: all 0.2s;
+    background: transparent; color: rgba(255,255,255,0.45);
+  }
+  .tab-btn.active {
+    background: #E8722A; color: white;
+    box-shadow: 0 2px 8px rgba(232,114,42,0.4);
+  }
+
+  /* PHONE */
+  .phone {
+    width: 340px;
+    background: #F5F0E8;
+    border-radius: 42px;
+    border: 8px solid #222;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px #333;
+    overflow: hidden;
+    position: relative;
+  }
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 28px; background: #222; border-radius: 0 0 18px 18px;
+    z-index: 20;
+  }
+  .status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 32px 22px 4px;
+  }
+  .status-bar .time { font-size: 12px; font-weight: 700; color: #1A1A1A; font-variant-numeric: tabular-nums; }
+  .battery {
+    width: 18px; height: 10px; border: 2px solid #1A1A1A; border-radius: 3px; position: relative;
+  }
+  .battery::after {
+    content: ''; position: absolute; right: -5px; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 5px; background: #1A1A1A; border-radius: 0 2px 2px 0;
+  }
+  .battery-fill {
+    position: absolute; left: 1px; top: 1px;
+    width: 70%; height: calc(100% - 2px); background: #1A1A1A; border-radius: 1px;
+  }
+
+  .screen { display: none; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    display: flex; border-top: 1px solid #E8E0D0; background: #fff;
+    padding: 8px 0 14px; flex-shrink: 0;
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .nav-icon { font-size: 20px; }
+  .nav-label { font-size: 9px; font-weight: 500; color: #9A9A9A; }
+  .nav-item.active .nav-label { color: #E8722A; font-weight: 700; }
+  .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #E8722A; }
+
+  /* SCROLL AREA */
+  .scroll-area { overflow-y: auto; flex: 1; }
+  .scroll-area::-webkit-scrollbar { display: none; }
+
+  /* ── SCREEN 1: LIST ── */
+  .s1-header {
+    padding: 10px 18px 12px; background: #fff; border-bottom: 1px solid #E8E0D0;
+  }
+  .s1-top { display: flex; justify-content: space-between; align-items: center; }
+  .s1-subtitle { font-size: 10px; font-weight: 700; color: #9A9A9A; letter-spacing: 0.08em; text-transform: uppercase; }
+  .s1-title { font-size: 22px; font-weight: 900; color: #1A1A1A; margin-top: 1px; }
+  .btn-add-fab {
+    width: 38px; height: 38px; border-radius: 19px; background: #E8722A; border: none;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    box-shadow: 0 3px 10px rgba(232,114,42,0.4); font-size: 22px; color: white; line-height: 1;
+  }
+  .stats-strip { display: flex; gap: 8px; margin-top: 10px; }
+  .stat-box {
+    flex: 1; background: #F5F0E8; border-radius: 10px; padding: 7px 10px;
+  }
+  .stat-val { font-size: 16px; font-weight: 900; color: #1A1A1A; }
+  .stat-label { font-size: 9px; color: #9A9A9A; margin-top: 1px; }
+
+  .site-list { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .site-card {
+    background: #fff; border-radius: 16px; padding: 13px 14px;
+    border-left: 4px solid #E8722A;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .site-card.completed { border-left-color: #9A9A9A; }
+  .site-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .site-status-active { font-size: 9px; font-weight: 700; color: #E8722A; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 3px; }
+  .site-status-done { font-size: 9px; font-weight: 700; color: #9A9A9A; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 3px; }
+  .site-name { font-size: 14px; font-weight: 800; color: #1A1A1A; line-height: 1.3; }
+  .site-addr { font-size: 11px; color: #9A9A9A; margin-top: 3px; display: flex; align-items: center; gap: 3px; }
+  .chevron { color: #CCC; font-size: 16px; margin-left: 6px; }
+  .site-tags { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .tag-orange {
+    background: #FFF0E6; border-radius: 8px; padding: 4px 10px;
+    font-size: 12px; font-weight: 700; color: #E8722A;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .tag-gray {
+    background: #F5F0E8; border-radius: 8px; padding: 4px 10px;
+    font-size: 11px; font-weight: 600; color: #4A4A4A;
+  }
+
+  /* ── SCREEN 2: DETAIL ── */
+  .s2-header {
+    padding: 10px 16px 12px; background: #fff; border-bottom: 1px solid #E8E0D0;
+  }
+  .s2-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .btn-back { background: none; border: none; cursor: pointer; font-size: 20px; color: #1A1A1A; padding: 0; line-height: 1; }
+  .s2-site-label { font-size: 10px; color: #E8722A; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  .s2-site-name { font-size: 15px; font-weight: 900; color: #1A1A1A; line-height: 1.2; margin-top: 1px; }
+  .btn-export {
+    display: flex; align-items: center; gap: 5px;
+    background: #1A1A1A; border: none; border-radius: 20px; padding: 7px 13px;
+    cursor: pointer; color: white; font-size: 11px; font-weight: 700; margin-left: auto; flex-shrink: 0;
+  }
+
+  .summary-table { background: #F5F0E8; border-radius: 12px; overflow: hidden; }
+  .st-header {
+    display: grid; grid-template-columns: 1fr 52px 62px;
+    padding: 6px 12px; border-bottom: 1px solid #E8E0D0;
+  }
+  .st-col-label { font-size: 9px; font-weight: 700; color: #9A9A9A; text-transform: uppercase; letter-spacing: 0.07em; }
+  .st-row {
+    display: grid; grid-template-columns: 1fr 52px 62px;
+    padding: 7px 12px; border-bottom: 1px solid #E8E0D0;
+  }
+  .st-row:last-of-type { border-bottom: none; }
+  .st-row.alt { background: rgba(0,0,0,0.02); }
+  .st-asphalt { font-size: 12px; font-weight: 700; color: #1A1A1A; }
+  .st-count { font-size: 12px; color: #4A4A4A; text-align: center; }
+  .st-tons { font-size: 13px; font-weight: 800; color: #E8722A; text-align: right; }
+  .st-footer {
+    display: grid; grid-template-columns: 1fr 52px 62px;
+    padding: 8px 12px; background: #1A1A1A;
+  }
+  .st-footer-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.6); }
+  .st-footer-count { font-size: 11px; color: rgba(255,255,255,0.6); text-align: center; }
+  .st-footer-tons { font-size: 15px; font-weight: 900; color: #E8722A; text-align: right; }
+
+  .deliveries-section { padding: 10px 14px; }
+  .section-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .section-title { font-size: 10px; font-weight: 700; color: #9A9A9A; text-transform: uppercase; letter-spacing: 0.08em; }
+  .section-sub { font-size: 11px; color: #9A9A9A; }
+  .delivery-list { display: flex; flex-direction: column; gap: 8px; }
+  .delivery-card {
+    background: #fff; border-radius: 12px; padding: 10px 12px;
+    display: flex; align-items: center; gap: 11px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .d-tons-box {
+    width: 42px; height: 42px; background: #FFF0E6; border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .d-tons-val { font-size: 14px; font-weight: 900; color: #E8722A; line-height: 1; }
+  .d-tons-unit { font-size: 9px; color: #E8722A; font-weight: 700; }
+  .d-info { flex: 1; }
+  .d-asphalt { font-size: 13px; font-weight: 700; color: #1A1A1A; }
+  .d-meta { font-size: 11px; color: #9A9A9A; margin-top: 2px; }
+  .d-photo-icon {
+    width: 30px; height: 30px; background: #F5F0E8; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+
+  .fab-row { padding: 8px 14px 4px; display: flex; justify-content: flex-end; }
+  .fab-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: #E8722A; border: none; border-radius: 28px; padding: 12px 18px;
+    cursor: pointer; color: white; font-size: 13px; font-weight: 800;
+    box-shadow: 0 4px 16px rgba(232,114,42,0.45);
+  }
+
+  /* ── SCREEN 3: ADD DELIVERY ── */
+  .s3-header {
+    padding: 10px 16px 12px; background: #fff; border-bottom: 1px solid #E8E0D0;
+  }
+  .s3-top { display: flex; align-items: center; gap: 10px; }
+  .s3-site-label { font-size: 10px; color: #9A9A9A; }
+  .s3-title { font-size: 17px; font-weight: 900; color: #1A1A1A; }
+
+  .form-area { padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  .scan-banner-success {
+    background: #E8F5EF; border: 1.5px solid #2E7D5E; border-radius: 14px; padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .scan-check {
+    width: 36px; height: 36px; background: #2E7D5E; border-radius: 18px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    font-size: 16px; color: white;
+  }
+  .scan-ok-title { font-size: 13px; font-weight: 700; color: #2E7D5E; }
+  .scan-ok-sub { font-size: 11px; color: #4A4A4A; margin-top: 2px; }
+
+  .scan-banner-idle {
+    background: #1A1A1A; border-radius: 14px; padding: 18px 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;
+  }
+  .scan-icon { font-size: 32px; }
+  .scan-idle-title { font-size: 13px; font-weight: 700; color: white; }
+  .scan-idle-sub { font-size: 11px; color: rgba(255,255,255,0.4); }
+
+  .field-label { font-size: 10px; font-weight: 700; color: #9A9A9A; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .asphalt-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+  .asphalt-pill {
+    padding: 8px 14px; border-radius: 20px; border: none; cursor: pointer;
+    font-size: 12px; font-weight: 700; background: #fff; color: #1A1A1A;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.15s;
+  }
+  .asphalt-pill.selected {
+    background: #E8722A; color: white;
+    box-shadow: 0 2px 8px rgba(232,114,42,0.4);
+  }
+
+  .text-field {
+    background: #fff; border-radius: 12px; padding: 11px 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    border: 1.5px solid #E8E0D0;
+  }
+  .tf-value { font-size: 14px; font-weight: 600; color: #1A1A1A; }
+  .tf-suffix { font-size: 13px; font-weight: 700; color: #E8722A; }
+
+  .photo-field {
+    background: #fff; border-radius: 12px; height: 70px;
+    display: flex; align-items: center; gap: 12px; padding: 0 14px;
+    border: 1.5px dashed #E8E0D0; cursor: pointer;
+  }
+  .photo-thumb {
+    width: 50px; height: 46px;
+    background: linear-gradient(135deg, #E8E0D0, #D4C8B4);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;
+  }
+  .photo-name { font-size: 12px; font-weight: 700; color: #1A1A1A; }
+  .photo-hint { font-size: 10px; color: #9A9A9A; margin-top: 2px; }
+
+  .btn-save {
+    background: #E8722A; border: none; border-radius: 14px; padding: 14px;
+    color: white; font-size: 15px; font-weight: 900; cursor: pointer; width: 100%;
+    box-shadow: 0 4px 16px rgba(232,114,42,0.45); margin-top: 2px;
+  }
+  .btn-save:active { transform: scale(0.98); }
+</style>
+</head>
+<body>
+
+<div class="page-title">
+  <h1>Moduł <span>Baustellen</span></h1>
+  <p>TimeTracker · asphaltbau</p>
+</div>
+
+<!-- Tab bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="showScreen('list', this)">Lista budów</button>
+  <button class="tab-btn" onclick="showScreen('detail', this)">Szczegóły</button>
+  <button class="tab-btn" onclick="showScreen('add', this)">Dodaj dostawę</button>
+</div>
+
+<!-- PHONE -->
+<div class="phone">
+  <div class="notch"></div>
+  <div class="status-bar">
+    <span class="time">9:41</span>
+    <div class="battery"><div class="battery-fill"></div></div>
+  </div>
+
+  <!-- ══ SCREEN 1: LISTA BUDÓW ══ -->
+  <div class="screen active" id="screen-list" style="height: 580px; display: flex; flex-direction: column;">
+    <div class="s1-header">
+      <div class="s1-top">
+        <div>
+          <div class="s1-subtitle">asphaltbau</div>
+          <div class="s1-title">Baustellen</div>
+        </div>
+        <button class="btn-add-fab">+</button>
+      </div>
+      <div class="stats-strip">
+        <div class="stat-box">
+          <div class="stat-val">2</div>
+          <div class="stat-label">Aktywne</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">940t</div>
+          <div class="stat-label">Łącznie ton</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">42</div>
+          <div class="stat-label">Dostawy</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+      <div class="site-list">
+
+        <!-- Budowa 1 -->
+        <div class="site-card" onclick="showScreen('detail', null)">
+          <div class="site-card-top">
+            <div style="flex:1">
+              <div class="site-status-active">● Aktywna</div>
+              <div class="site-name">A40 Sanierung Abschnitt 3</div>
+              <div class="site-addr">📍 A40, 45127 Essen</div>
+            </div>
+            <span class="chevron">›</span>
+          </div>
+          <div class="site-tags">
+            <div class="tag-orange">🚛 312.5t</div>
+            <div class="tag-gray">14 dostaw</div>
+            <div class="tag-gray">AC 11 D S</div>
+            <div class="tag-gray">SMA 11 S</div>
+          </div>
+        </div>
+
+        <!-- Budowa 2 -->
+        <div class="site-card" onclick="showScreen('detail', null)">
+          <div class="site-card-top">
+            <div style="flex:1">
+              <div class="site-status-active">● Aktywna</div>
+              <div class="site-name">Parkplatz Kaufland Bochum</div>
+              <div class="site-addr">📍 Castroper Str. 80, Bochum</div>
+            </div>
+            <span class="chevron">›</span>
+          </div>
+          <div class="site-tags">
+            <div class="tag-orange">🚛 88.0t</div>
+            <div class="tag-gray">6 dostaw</div>
+            <div class="tag-gray">AC 11 D S</div>
+          </div>
+        </div>
+
+        <!-- Budowa 3 zakończona -->
+        <div class="site-card completed">
+          <div class="site-card-top">
+            <div style="flex:1">
+              <div class="site-status-done">✓ Zakończona</div>
+              <div class="site-name">Industriestraße Dortmund</div>
+              <div class="site-addr">📍 Industriestr. 12, Dortmund</div>
+            </div>
+            <span class="chevron" style="color:#CCC">›</span>
+          </div>
+          <div class="site-tags">
+            <div class="tag-gray" style="color:#9A9A9A">540.0t</div>
+            <div class="tag-gray">22 dostawy</div>
+            <div class="tag-gray">AC 11 D S</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+      <div class="nav-item"><div class="nav-icon">⊞</div><div class="nav-label">Dashboard</div></div>
+      <div class="nav-item"><div class="nav-icon">👥</div><div class="nav-label">Ekipa</div></div>
+      <div class="nav-item active"><div class="nav-icon">📍</div><div class="nav-label">Baustellen</div><div class="nav-dot"></div></div>
+      <div class="nav-item"><div class="nav-icon">📊</div><div class="nav-label">Raporty</div></div>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN 2: SZCZEGÓŁY ══ -->
+  <div class="screen" id="screen-detail" style="height: 580px; display: flex; flex-direction: column;">
+    <div class="s2-header">
+      <div class="s2-top">
+        <button class="btn-back" onclick="showScreen('list', null)">‹</button>
+        <div style="flex:1">
+          <div class="s2-site-label">● Aktywna</div>
+          <div class="s2-site-name">A40 Sanierung Abschnitt 3</div>
+        </div>
+        <button class="btn-export">⬇ Export</button>
+      </div>
+
+      <div class="summary-table">
+        <div class="st-header">
+          <span class="st-col-label">Klasa asfaltu</span>
+          <span class="st-col-label" style="text-align:center">Dostaw</span>
+          <span class="st-col-label" style="text-align:right">Tony</span>
+        </div>
+        <div class="st-row">
+          <span class="st-asphalt">AC 11 D S</span>
+          <span class="st-count">8×</span>
+          <span class="st-tons">196.0t</span>
+        </div>
+        <div class="st-row alt">
+          <span class="st-asphalt">SMA 11 S</span>
+          <span class="st-count">4×</span>
+          <span class="st-tons">72.0t</span>
+        </div>
+        <div class="st-row">
+          <span class="st-asphalt">AC 22 T S</span>
+          <span class="st-count">2×</span>
+          <span class="st-tons">44.5t</span>
+        </div>
+        <div class="st-footer">
+          <span class="st-footer-label">RAZEM</span>
+          <span class="st-footer-count">14×</span>
+          <span class="st-footer-tons">312.5t</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area" style="flex:1">
+      <div class="deliveries-section">
+        <div class="section-row">
+          <span class="section-title">Dostawy — 18.03.2024</span>
+          <span class="section-sub">4 dziś</span>
+        </div>
+        <div class="delivery-list">
+          <div class="delivery-card">
+            <div class="d-tons-box"><div class="d-tons-val">24.5</div><div class="d-tons-unit">ton</div></div>
+            <div class="d-info">
+              <div class="d-asphalt">AC 11 D S</div>
+              <div class="d-meta">Kemna Bau · 06:42 · LS-20240318-001</div>
+            </div>
+            <div class="d-photo-icon">📷</div>
+          </div>
+          <div class="delivery-card">
+            <div class="d-tons-box"><div class="d-tons-val">18.0</div><div class="d-tons-unit">ton</div></div>
+            <div class="d-info">
+              <div class="d-asphalt">SMA 11 S</div>
+              <div class="d-meta">Kemna Bau · 08:15 · LS-20240318-002</div>
+            </div>
+            <div class="d-photo-icon">📷</div>
+          </div>
+          <div class="delivery-card">
+            <div class="d-tons-box"><div class="d-tons-val">24.5</div><div class="d-tons-unit">ton</div></div>
+            <div class="d-info">
+              <div class="d-asphalt">AC 11 D S</div>
+              <div class="d-meta">Kemna Bau · 09:50 · LS-20240318-003</div>
+            </div>
+            <div class="d-photo-icon" style="opacity:0.3">📷</div>
+          </div>
+          <div class="delivery-card">
+            <div class="d-tons-box"><div class="d-tons-val">21.0</div><div class="d-tons-unit">ton</div></div>
+            <div class="d-info">
+              <div class="d-asphalt">AC 22 T S</div>
+              <div class="d-meta">Strabag · 11:30 · LS-20240318-004</div>
+            </div>
+            <div class="d-photo-icon">📷</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fab-row">
+      <button class="fab-btn" onclick="showScreen('add', null)">+ Dodaj dostawę</button>
+    </div>
+
+    <div class="bottom-nav">
+      <div class="nav-item"><div class="nav-icon">⊞</div><div class="nav-label">Dashboard</div></div>
+      <div class="nav-item"><div class="nav-icon">👥</div><div class="nav-label">Ekipa</div></div>
+      <div class="nav-item active"><div class="nav-icon">📍</div><div class="nav-label">Baustellen</div><div class="nav-dot"></div></div>
+      <div class="nav-item"><div class="nav-icon">📊</div><div class="nav-label">Raporty</div></div>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN 3: DODAJ DOSTAWĘ ══ -->
+  <div class="screen" id="screen-add" style="height: 580px; display: flex; flex-direction: column;">
+    <div class="s3-header">
+      <div class="s3-top">
+        <button class="btn-back" onclick="showScreen('detail', null)">‹</button>
+        <div>
+          <div class="s3-site-label">A40 Sanierung Abschnitt 3</div>
+          <div class="s3-title">Nowa dostawa</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-area" style="flex:1">
+      <div class="form-area">
+
+        <!-- Scan banner — success state -->
+        <div class="scan-banner-success" id="scan-success">
+          <div class="scan-check">✓</div>
+          <div>
+            <div class="scan-ok-title">Lieferschein zeskanowany</div>
+            <div class="scan-ok-sub">Dane uzupełnione automatycznie</div>
+          </div>
+        </div>
+
+        <!-- Scan banner — idle (toggle demo) -->
+        <div class="scan-banner-idle" id="scan-idle" style="display:none" onclick="toggleScan()">
+          <div class="scan-icon">📷</div>
+          <div class="scan-idle-title">Skanuj Lieferschein</div>
+          <div class="scan-idle-sub">lub wpisz ręcznie poniżej</div>
+        </div>
+
+        <div style="text-align:center">
+          <button onclick="toggleScan()" style="background:none;border:1px solid #E8E0D0;border-radius:8px;padding:5px 14px;font-size:11px;color:#9A9A9A;cursor:pointer">
+            Demo: przełącz stan skanera
+          </button>
+        </div>
+
+        <!-- Asphalt -->
+        <div>
+          <div class="field-label">Klasa asfaltu</div>
+          <div class="asphalt-pills">
+            <button class="asphalt-pill selected" onclick="selectPill(this)">AC 11 D S</button>
+            <button class="asphalt-pill" onclick="selectPill(this)">SMA 11 S</button>
+            <button class="asphalt-pill" onclick="selectPill(this)">AC 22 T S</button>
+          </div>
+        </div>
+
+        <!-- Tony -->
+        <div>
+          <div class="field-label">Tony</div>
+          <div class="text-field">
+            <span class="tf-value">24.5</span>
+            <span class="tf-suffix">t</span>
+          </div>
+        </div>
+
+        <!-- Nr Lieferscheinu -->
+        <div>
+          <div class="field-label">Nr Lieferscheinu</div>
+          <div class="text-field">
+            <span class="tf-value">LS-20240318-005</span>
+          </div>
+        </div>
+
+        <!-- Dostawca -->
+        <div>
+          <div class="field-label">Dostawca / Firma</div>
+          <div class="text-field">
+            <span class="tf-value">Kemna Bau AG</span>
+          </div>
+        </div>
+
+        <!-- Godzina -->
+        <div>
+          <div class="field-label">Godzina dostawy</div>
+          <div class="text-field">
+            <span class="tf-value">13:45</span>
+          </div>
+        </div>
+
+        <!-- Zdjęcie -->
+        <div>
+          <div class="field-label">Zdjęcie dokumentu</div>
+          <div class="photo-field">
+            <div class="photo-thumb">📄</div>
+            <div>
+              <div class="photo-name">LS_0318_005.jpg</div>
+              <div class="photo-hint">Dotknij aby zmienić</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-save">Zapisz dostawę</button>
+
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+      <div class="nav-item"><div class="nav-icon">⊞</div><div class="nav-label">Dashboard</div></div>
+      <div class="nav-item"><div class="nav-icon">👥</div><div class="nav-label">Ekipa</div></div>
+      <div class="nav-item active"><div class="nav-icon">📍</div><div class="nav-label">Baustellen</div><div class="nav-dot"></div></div>
+      <div class="nav-item"><div class="nav-icon">📊</div><div class="nav-label">Raporty</div></div>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<script>
+  function showScreen(name, btn) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+    if (btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    } else {
+      // sync tab bar
+      const map = { list: 0, detail: 1, add: 2 };
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', i === map[name]);
+      });
+    }
+  }
+
+  function selectPill(el) {
+    el.closest('.asphalt-pills').querySelectorAll('.asphalt-pill').forEach(p => p.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  let scanned = true;
+  function toggleScan() {
+    scanned = !scanned;
+    document.getElementById('scan-success').style.display = scanned ? 'flex' : 'none';
+    document.getElementById('scan-idle').style.display = scanned ? 'none' : 'flex';
+  }
+</script>
+
+</body>
+</html>
