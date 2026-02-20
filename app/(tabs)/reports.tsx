@@ -23,7 +23,6 @@ import {
   generateExcelReport,
   generatePdfReport,
   shareReport,
-  printReport,
   getSavedReports,
   deleteReport,
   ExportOptions,
@@ -159,33 +158,9 @@ export default function ReportsScreen() {
         fileUri = await generatePdfReport(options);
       }
 
-      // Pokaż opcje po wygenerowaniu
-      Alert.alert(
-        'Raport wygenerowany',
-        'Co chcesz zrobić z raportem?',
-        [
-          {
-            text: 'Udostępnij',
-            onPress: () => shareReport(fileUri),
-          },
-          {
-            text: 'Drukuj (PDF)',
-            onPress: () => exportFormat === 'pdf' && printReport(fileUri),
-            style: exportFormat === 'pdf' ? 'default' : 'cancel',
-          },
-          {
-            text: 'Zapisz',
-            onPress: () => {
-              Alert.alert('Sukces', 'Raport został zapisany');
-              loadSavedReports();
-            },
-          },
-          {
-            text: 'Anuluj',
-            style: 'cancel',
-          },
-        ]
-      );
+      // Natychmiast uruchom udostępnianie po wygenerowaniu
+      await shareReport(fileUri);
+      loadSavedReports();
     } catch (error) {
       Alert.alert(
         'Błąd',
