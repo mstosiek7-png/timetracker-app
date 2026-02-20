@@ -44,6 +44,8 @@ import { EmployeeList } from '../../components/employee/EmployeeList';
 import { EmployeeForm } from '../../components/employee/EmployeeForm';
 import { useCreateTimeEntry, useUpdateTimeEntry, useDeleteTimeEntry } from '../../hooks/useTimeEntries';
 import { TimeEntry, TimeEntryInsert, TimeEntryStatus } from '../../types/models';
+import { supabase } from '../../services/supabase';
+import { formatHours } from '../../utils/formatting';
 
 // =====================================================
 // Helper Functions
@@ -169,6 +171,28 @@ export default function DashboardScreen() {
     Alert.alert('Sukces', 'Zbiorcze wpisy zostały dodane');
   };
 
+  const handleSignOut = async () => {
+    Alert.alert(
+      'Wylogowanie',
+      'Czy na pewno chcesz się wylogować?',
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        {
+          text: 'Wyloguj',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await supabase.auth.signOut();
+              router.replace('/auth/sign-in');
+            } catch (error) {
+              Alert.alert('Błąd', 'Nie udało się wylogować');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // =====================================================
   // Render
   // =====================================================
@@ -210,10 +234,10 @@ export default function DashboardScreen() {
   const today = format(new Date(), 'dd.MM.yyyy', { locale: pl });
 
   const statusData: { status: TimeEntryStatus; label: string; hours: string }[] = [
-    { status: 'work', label: 'PRACA', hours: `${stats?.workHours?.toFixed(1) || '0.0'}h` },
-    { status: 'sick', label: 'CHOROBOWE', hours: `${stats?.sickHours?.toFixed(1) || '0.0'}h` },
-    { status: 'vacation', label: 'URLOPY', hours: `${stats?.vacationHours?.toFixed(1) || '0.0'}h` },
-    { status: 'fza', label: 'FZA', hours: `${stats?.fzaHours?.toFixed(1) || '0.0'}h` },
+    { status: 'work', label: 'PRACA', hours: formatHours(stats?.workHours || 0, true) },
+    { status: 'sick', label: 'CHOROBOWE', hours: formatHours(stats?.sickHours || 0, true) },
+    { status: 'vacation', label: 'URLOPY', hours: formatHours(stats?.vacationHours || 0, true) },
+    { status: 'fza', label: 'FZA', hours: formatHours(stats?.fzaHours || 0, true) },
   ];
 
   return (
@@ -226,11 +250,11 @@ export default function DashboardScreen() {
           <View style={styles.headerRightContainer}>
             <Text style={styles.headerDate}>{today}</Text>
             <TouchableOpacity 
-              style={styles.loginButton}
-              onPress={() => router.push('/auth/sign-in')}
+              style={styles.logoutButton}
+              onPress={handleSignOut}
             >
-              <Ionicons name="log-in-outline" size={20} color={theme.colors.accent} />
-              <Text style={styles.loginButtonText}>Logowanie</Text>
+              <Ionicons name="log-out-outline" size={20} color={theme.colors.accent} />
+              <Text style={styles.logoutButtonText}>Wyloguj</Text>
             </TouchableOpacity>
           </View>
         }
@@ -285,7 +309,7 @@ export default function DashboardScreen() {
                           {employee?.name || 'Nieznany pracownik'}
                         </Text>
                         <Text style={styles.entryDate}>
-                          {format(new Date(entry.date), 'dd.MM.yyyy')} • {entry.hours}h
+                          {format(new Date(entry.date), 'dd.MM.yyyy')} • {formatHours(entry.hours, true)}
                         </Text>
                         {entry.notes ? (
                           <Text style={styles.entryNotes} numberOfLines={1}>
@@ -700,7 +724,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: theme.spacing.xs,
   },
-  loginButton: {
+  logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.xs,
@@ -710,7 +734,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.accent,
     borderRadius: theme.radius.sm,
   },
-  loginButtonText: {
+  logoutButtonText: {
     fontSize: theme.fontSize.sm,
     fontWeight: '700',
     color: theme.colors.accent,

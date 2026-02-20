@@ -6,7 +6,7 @@ import { STATUS_LABELS, STATUS_COLORS, STATUS_ICONS } from './constants';
 import { TimeEntryStatus } from '@/types/models';
 
 /**
- * Formatuj godziny (np. 8.5 -> "8.5h" lub "8h 30min")
+ * Formatuj godziny (np. 8.5 -> "8,5h" lub "8h 30min")
  */
 export const formatHours = (hours: number, detailed = false): string => {
   if (detailed) {
@@ -15,7 +15,8 @@ export const formatHours = (hours: number, detailed = false): string => {
     if (m === 0) return `${h}h`;
     return `${h}h ${m}min`;
   }
-  return `${hours}h`;
+  // Format dziesiętny z zaokrągleniem do 1 miejsca po przecinku
+  return `${hours.toFixed(1).replace('.', ',')}h`;
 };
 
 /**

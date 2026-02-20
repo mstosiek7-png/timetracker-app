@@ -23,6 +23,7 @@ import { pl } from 'date-fns/locale';
 
 import { TimeEntry, TimeEntryInsert, TimeEntryStatus } from '../../types/models';
 import { useEmployees } from '../../hooks/useEmployees';
+import { formatHours } from '../../utils/formatting';
 
 // =====================================================
 // Types
@@ -92,7 +93,8 @@ export default function TimeEntryForm({
     const diffMs = endTime.getTime() - startTime.getTime();
     const diffMinutes = diffMs / (1000 * 60);
     const diffHours = diffMinutes / 60;
-    return Math.round(diffHours * 10) / 10; // zaokrąglij do 0.1 godziny
+    // Zwróć dokładną wartość (zostanie zapisana do bazy danych)
+    return diffHours;
   };
 
   const validateForm = (): boolean => {
@@ -238,7 +240,7 @@ export default function TimeEntryForm({
 
             <View style={styles.timeResultWrapper}>
               <Text style={styles.timeLabel}>Razem</Text>
-              <Text style={styles.hoursResult}>{calculateHours().toFixed(1)}h</Text>
+              <Text style={styles.hoursResult}>{formatHours(calculateHours(), true)}</Text>
             </View>
           </View>
           {startTime >= endTime && (

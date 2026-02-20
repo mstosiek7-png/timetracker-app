@@ -32,6 +32,7 @@ import { useEmployees } from '../../hooks/useEmployees';
 import { useTimeEntries } from '../../hooks/useTimeEntries';
 import { theme } from '../../constants/theme';
 import { Card, PageHeader, SectionTitle, FAB, StatusBadge, StatBox } from '../../components/ui';
+import { formatHours } from '../../utils/formatting';
 
 // Types
 type ExportFormat = 'excel' | 'pdf';
@@ -267,11 +268,11 @@ export default function ReportsScreen() {
       .reduce((sum, entry) => sum + entry.hours, 0);
 
     return {
-      totalHours: totalHours.toFixed(2),
-      workHours: workHours.toFixed(2),
-      sickHours: sickHours.toFixed(2),
-      vacationHours: vacationHours.toFixed(2),
-      fzaHours: fzaHours.toFixed(2),
+      totalHours: totalHours,
+      workHours: workHours,
+      sickHours: sickHours,
+      vacationHours: vacationHours,
+      fzaHours: fzaHours,
       entriesCount: filteredEntries.length,
       employeesCount: new Set(filteredEntries.map(entry => entry.employee_id)).size,
     };
@@ -302,7 +303,7 @@ export default function ReportsScreen() {
         <View style={styles.statsRow}>
           <StatBox
             label="Łącznie godzin"
-            value={stats.totalHours}
+            value={formatHours(stats.totalHours, true)}
             color={theme.colors.accent}
           />
           <StatBox
@@ -563,19 +564,19 @@ export default function ReportsScreen() {
           <View style={styles.statusSummary}>
             <View style={styles.statusItem}>
               <StatusBadge status="work" label="Praca" />
-              <Text style={[styles.statusValue, { color: theme.colors.statusColors.work.text }]}>{stats.workHours} h</Text>
+              <Text style={[styles.statusValue, { color: theme.colors.statusColors.work.text }]}>{formatHours(stats.workHours, true)}</Text>
             </View>
             <View style={styles.statusItem}>
               <StatusBadge status="sick" label="Chorobowe" />
-              <Text style={[styles.statusValue, { color: theme.colors.statusColors.sick.text }]}>{stats.sickHours} h</Text>
+              <Text style={[styles.statusValue, { color: theme.colors.statusColors.sick.text }]}>{formatHours(stats.sickHours, true)}</Text>
             </View>
             <View style={styles.statusItem}>
               <StatusBadge status="vacation" label="Urlop" />
-              <Text style={[styles.statusValue, { color: theme.colors.statusColors.vacation.text }]}>{stats.vacationHours} h</Text>
+              <Text style={[styles.statusValue, { color: theme.colors.statusColors.vacation.text }]}>{formatHours(stats.vacationHours, true)}</Text>
             </View>
             <View style={styles.statusItem}>
               <StatusBadge status="fza" label="FZA" />
-              <Text style={[styles.statusValue, { color: theme.colors.statusColors.fza.text }]}>{stats.fzaHours} h</Text>
+              <Text style={[styles.statusValue, { color: theme.colors.statusColors.fza.text }]}>{formatHours(stats.fzaHours, true)}</Text>
             </View>
           </View>
         </Card>

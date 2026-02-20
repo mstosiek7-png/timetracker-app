@@ -26,6 +26,7 @@ import { useMonthlySummary } from '../../hooks/useTimeEntries';
 import { TimeEntryStatus } from '../../types/models';
 import { theme, StatusType } from '../../constants/theme';
 import { Card, PageHeader, SectionTitle, StatBox, StatusBadge } from '../../components/ui';
+import { formatHours } from '../../utils/formatting';
 
 // =====================================================
 // Types
@@ -291,7 +292,7 @@ export default function MonthlyViewScreen() {
                   <View style={styles.statsRow}>
                     <View style={styles.statBoxWrapper}>
                       <StatBox
-                        value={monthlyStats.totalHours.toFixed(1)}
+                        value={formatHours(monthlyStats.totalHours, true)}
                         label="Łącznie godzin"
                       />
                     </View>
@@ -303,7 +304,7 @@ export default function MonthlyViewScreen() {
                     </View>
                     <View style={styles.statBoxWrapper}>
                       <StatBox
-                        value={monthlyStats.averagePerDay.toFixed(1)}
+                        value={formatHours(monthlyStats.averagePerDay, true)}
                         label="Średnia/dzień"
                       />
                     </View>
@@ -317,25 +318,25 @@ export default function MonthlyViewScreen() {
                     <View style={styles.statusRow}>
                       <StatusBadge status="work" />
                       <Text style={styles.statusHours}>
-                        {monthlyStats.workHours.toFixed(1)}h
+                        {formatHours(monthlyStats.workHours, true)}
                       </Text>
                     </View>
                     <View style={styles.statusRow}>
                       <StatusBadge status="sick" />
                       <Text style={styles.statusHours}>
-                        {monthlyStats.sickHours.toFixed(1)}h
+                        {formatHours(monthlyStats.sickHours, true)}
                       </Text>
                     </View>
                     <View style={styles.statusRow}>
                       <StatusBadge status="vacation" />
                       <Text style={styles.statusHours}>
-                        {monthlyStats.vacationHours.toFixed(1)}h
+                        {formatHours(monthlyStats.vacationHours, true)}
                       </Text>
                     </View>
                     <View style={styles.statusRow}>
                       <StatusBadge status="fza" />
                       <Text style={styles.statusHours}>
-                        {monthlyStats.fzaHours.toFixed(1)}h
+                        {formatHours(monthlyStats.fzaHours, true)}
                       </Text>
                     </View>
                   </View>
@@ -382,7 +383,7 @@ export default function MonthlyViewScreen() {
                           {day.totalHours > 0 && (
                             <View style={styles.dayEntries}>
                               <Text style={styles.dayHours}>
-                                {day.totalHours}h
+                                {formatHours(day.totalHours, true)}
                               </Text>
                               {day.entries.length > 0 && (
                                 <View style={styles.statusIndicators}>
@@ -430,7 +431,7 @@ export default function MonthlyViewScreen() {
                             </View>
                             <View style={styles.entryDetails}>
                               <Text style={styles.entryHours}>
-                                {entry.hours} godzin
+                                {formatHours(entry.hours, true)}
                               </Text>
                               {entry.notes && (
                                 <Text style={styles.entryNotes}>
