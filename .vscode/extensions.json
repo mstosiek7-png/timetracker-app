@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "saoudrizwan.claude-dev",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "supabase.supabase-vscode",
+    "firsttris.vscode-jest-runner",
+    "streetsidesoftware.code-spell-checker",
+    "usernamehw.errorlens"
+  ]
+}

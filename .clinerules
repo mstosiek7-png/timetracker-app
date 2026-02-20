@@ -1,0 +1,25 @@
+# TimeTracker — Reguły Cline
+
+## Memory Bank (OBOWIĄZKOWE)
+Na początku każdej sesji: przeczytaj WSZYSTKIE pliki z .cline/memory-bank/
+
+Na końcu każdej sesji (lub na polecenie "zapisz postęp"):
+1. Zaktualizuj activeContext.md — co zrobiłeś, od czego zacząć następnym razem
+2. Zaktualizuj progress.md — przenieś ukończone do sekcji Gotowe
+3. Decyzja projektowa → systemPatterns.md
+4. Napotkany i rozwiązany błąd → techContext.md
+
+## Styl kodu (OBOWIĄZKOWE)
+- Wszystkie kolory WYŁĄCZNIE z constants/theme.ts — nigdy hardcoded
+- Komponenty bazowe z components/ui/ — nie duplikuj
+- TypeScript strict — wszystkie typy jawnie zdefiniowane
+- Flat design — zero shadows, zero elevation, zero gradients
+- Na Android: input.replace(',', '.') przed każdym parseFloat()
+
+## Mockupy
+Przed implementacją ekranu otwórz i przeanalizuj plik HTML z docs/mockups/
+Odwzoruj 1:1 — kolory, układ, typografia, zachowanie
+
+## Instalacja paczek
+Użyj pnpm (nie npm, nie yarn)
+Sprawdź czy paczka nie jest już zainstalowana przed dodaniem

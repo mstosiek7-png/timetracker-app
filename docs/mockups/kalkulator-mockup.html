@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalkulator Asfaltu</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #111;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    gap: 16px;
+  }
+  .page-title { text-align: center; margin-bottom: 8px; }
+  .page-title h1 { font-size: 26px; font-weight: 900; color: #fff; letter-spacing: -0.02em; }
+  .page-title h1 span { color: #E8722A; }
+  .page-title p { font-size: 13px; color: rgba(255,255,255,0.35); margin-top: 4px; }
+
+  .phone {
+    width: 340px;
+    background: #F5F0E8;
+    border-radius: 42px;
+    border: 8px solid #222;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 28px; background: #222;
+    border-radius: 0 0 18px 18px; z-index: 20;
+  }
+  .status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 32px 22px 4px; flex-shrink: 0;
+  }
+  .status-bar .time { font-size: 12px; font-weight: 700; color: #1A1A1A; }
+  .battery { width: 18px; height: 10px; border: 2px solid #1A1A1A; border-radius: 3px; position: relative; }
+  .battery-fill { position: absolute; left: 1px; top: 1px; width: 70%; height: calc(100% - 2px); background: #1A1A1A; border-radius: 1px; }
+
+  /* HEADER */
+  .header {
+    padding: 8px 18px 12px; background: #fff;
+    border-bottom: 1px solid #E8E0D0; flex-shrink: 0;
+  }
+  .back-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+  .btn-back { background: none; border: none; font-size: 22px; color: #1A1A1A; cursor: pointer; padding: 0; line-height: 1; }
+  .header-sub { font-size: 10px; color: #9A9A9A; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+  .header-title { font-size: 22px; font-weight: 900; color: #1A1A1A; }
+
+  /* SCROLL */
+  .scroll { overflow-y: auto; flex: 1; padding: 14px 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  /* SECTION LABEL */
+  .section-label { font-size: 10px; font-weight: 700; color: #9A9A9A; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+
+  /* DENSITY CARD */
+  .density-card {
+    background: #fff; border-radius: 14px; padding: 12px 14px;
+    border: 1.5px solid #E8E0D0;
+  }
+  .density-row { display: flex; align-items: center; justify-content: space-between; }
+  .density-label { font-size: 13px; font-weight: 700; color: #1A1A1A; }
+  .density-value { font-size: 18px; font-weight: 900; color: #E8722A; }
+  .density-unit { font-size: 12px; color: #9A9A9A; margin-top: 2px; text-align: right; }
+  .btn-edit {
+    background: #F5F0E8; border: none; border-radius: 8px;
+    padding: 6px 12px; font-size: 12px; font-weight: 700; color: #4A4A4A;
+    cursor: pointer; margin-top: 8px; width: 100%;
+  }
+  .btn-edit:active { background: #E8E0D0; }
+
+  /* EDIT MODE */
+  .edit-mode { display: none; margin-top: 10px; border-top: 1px solid #E8E0D0; padding-top: 10px; }
+  .edit-mode.visible { display: block; }
+  .edit-input-row { display: flex; gap: 8px; align-items: center; }
+  .edit-input {
+    flex: 1; background: #F5F0E8; border: 1.5px solid #E8E0D0; border-radius: 10px;
+    padding: 8px 12px; font-size: 16px; font-weight: 700; color: #1A1A1A;
+    font-family: inherit; outline: none;
+  }
+  .edit-input:focus { border-color: #E8722A; }
+  .btn-save-density {
+    background: #E8722A; border: none; border-radius: 10px;
+    padding: 8px 14px; font-size: 13px; font-weight: 700; color: white; cursor: pointer;
+  }
+
+  /* INPUT FIELDS */
+  .field { background: #fff; border-radius: 14px; border: 1.5px solid #E8E0D0; overflow: hidden; }
+  .field-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px 0;
+  }
+  .field-name { font-size: 11px; font-weight: 700; color: #9A9A9A; text-transform: uppercase; letter-spacing: 0.07em; }
+  .field-unit { font-size: 11px; color: #9A9A9A; }
+  .field input {
+    width: 100%; border: none; background: transparent; padding: 6px 14px 12px;
+    font-size: 24px; font-weight: 900; color: #1A1A1A; font-family: inherit; outline: none;
+  }
+  .field input::placeholder { color: #D4C8B4; font-weight: 700; }
+
+  /* FORMULA PREVIEW */
+  .formula {
+    background: #1A1A1A; border-radius: 14px; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap;
+  }
+  .f-val { font-size: 15px; font-weight: 900; color: #E8722A; font-variant-numeric: tabular-nums; }
+  .f-op { font-size: 13px; color: rgba(255,255,255,0.4); }
+  .f-unit { font-size: 11px; color: rgba(255,255,255,0.4); }
+  .f-result { font-size: 18px; font-weight: 900; color: #fff; }
+
+  /* RESULT BOX */
+  .result-box {
+    background: #E8722A; border-radius: 16px; padding: 16px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .result-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); letter-spacing: 0.08em; text-transform: uppercase; }
+  .result-value { font-size: 42px; font-weight: 900; color: #fff; line-height: 1; font-variant-numeric: tabular-nums; }
+  .result-unit { font-size: 18px; font-weight: 700; color: rgba(255,255,255,0.8); }
+
+  /* NADDATEK */
+  .naddatek-card { background: #fff; border-radius: 14px; border: 1.5px solid #E8E0D0; overflow: hidden; }
+  .naddatek-title { padding: 10px 14px 8px; font-size: 11px; font-weight: 700; color: #9A9A9A; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid #E8E0D0; }
+  .checkbox-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 14px; border-bottom: 1px solid #F5F0E8; cursor: pointer;
+    transition: background 0.1s;
+  }
+  .checkbox-row:last-child { border-bottom: none; }
+  .checkbox-row:active { background: #F5F0E8; }
+  .checkbox-row.checked { background: #FFF8F4; }
+  .cb-left { display: flex; align-items: center; gap: 10px; }
+  .cb-box {
+    width: 22px; height: 22px; border-radius: 6px; border: 2px solid #E8E0D0;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .cb-box.checked { background: #E8722A; border-color: #E8722A; }
+  .cb-check { color: white; font-size: 13px; font-weight: 900; display: none; }
+  .cb-box.checked .cb-check { display: block; }
+  .cb-label { font-size: 15px; font-weight: 700; color: #1A1A1A; }
+  .cb-result { font-size: 13px; font-weight: 700; color: #E8722A; }
+  .cb-result.hidden { visibility: hidden; }
+
+  /* custom % row */
+  .custom-row { padding: 10px 14px; border-top: 1px solid #E8E0D0; }
+  .custom-input-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+  .custom-pct-input {
+    width: 70px; background: #F5F0E8; border: 1.5px solid #E8E0D0; border-radius: 10px;
+    padding: 8px 10px; font-size: 16px; font-weight: 900; color: #1A1A1A;
+    font-family: inherit; outline: none; text-align: center;
+  }
+  .custom-pct-input:focus { border-color: #E8722A; }
+  .pct-sign { font-size: 16px; font-weight: 700; color: #9A9A9A; }
+  .custom-result { font-size: 13px; font-weight: 700; color: #E8722A; margin-left: auto; }
+
+  /* SUMA KOŃCOWA */
+  .suma-card {
+    background: #1A1A1A; border-radius: 16px; padding: 16px;
+  }
+  .suma-breakdown { margin-bottom: 10px; }
+  .suma-line { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+  .suma-line-label { font-size: 13px; color: rgba(255,255,255,0.5); }
+  .suma-line-val { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7); }
+  .suma-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 8px 0; }
+  .suma-total-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .suma-total-label { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 0.08em; text-transform: uppercase; }
+  .suma-total-val { font-size: 32px; font-weight: 900; color: #E8722A; font-variant-numeric: tabular-nums; }
+  .suma-total-unit { font-size: 16px; color: rgba(255,255,255,0.5); margin-left: 4px; }
+  .suma-formula-text { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 6px; text-align: right; }
+
+  /* RESET */
+  .btn-reset {
+    background: none; border: 1.5px solid #E8E0D0; border-radius: 12px;
+    padding: 12px; font-size: 13px; font-weight: 700; color: #9A9A9A; cursor: pointer; width: 100%;
+  }
+  .btn-reset:active { background: #E8E0D0; }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    display: flex; border-top: 1px solid #E8E0D0; background: #fff;
+    padding: 8px 0 14px; flex-shrink: 0;
+  }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .nav-icon { font-size: 20px; }
+  .nav-label { font-size: 9px; font-weight: 500; color: #9A9A9A; }
+  .nav-item.active .nav-label { color: #E8722A; font-weight: 700; }
+  .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #E8722A; }
+</style>
+</head>
+<body>
+
+<div class="page-title">
+  <h1>Kalkulator <span>Asfaltu</span></h1>
+  <p>TimeTracker · asphaltbau · interaktywny mockup</p>
+</div>
+
+<div class="phone">
+  <div class="notch"></div>
+  <div class="status-bar">
+    <span class="time">9:41</span>
+    <div class="battery"><div class="battery-fill"></div></div>
+  </div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="back-row">
+      <button class="btn-back">‹</button>
+      <div>
+        <div class="header-sub">asphaltbau</div>
+        <div class="header-title">Kalkulator</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCROLL -->
+  <div class="scroll">
+
+    <!-- GĘSTOŚĆ -->
+    <div>
+      <div class="section-label">Gęstość materiału</div>
+      <div class="density-card">
+        <div class="density-row">
+          <span class="density-label">Gęstość</span>
+          <div style="text-align:right">
+            <div class="density-value" id="density-display">2.40</div>
+            <div class="density-unit">t/m³</div>
+          </div>
+        </div>
+        <button class="btn-edit" onclick="toggleEdit()">✎ Zmień gęstość</button>
+        <div class="edit-mode" id="edit-mode">
+          <div class="edit-input-row">
+            <input class="edit-input" type="number" id="density-input" value="2.40" step="0.01" min="1" max="4" placeholder="np. 2.40">
+            <button class="btn-save-density" onclick="saveDensity()">Zapisz</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POLA WEJŚCIOWE -->
+    <div>
+      <div class="section-label">Dane</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+
+        <div class="field">
+          <div class="field-header">
+            <span class="field-name">Powierzchnia</span>
+            <span class="field-unit">m²</span>
+          </div>
+          <input type="number" id="area" placeholder="0" oninput="calculate()" inputmode="decimal">
+        </div>
+
+        <div class="field">
+          <div class="field-header">
+            <span class="field-name">Grubość warstwy</span>
+            <span class="field-unit">cm</span>
+          </div>
+          <input type="number" id="thickness" placeholder="0" oninput="calculate()" inputmode="decimal">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PODGLĄD FORMUŁY -->
+    <div class="formula" id="formula-box">
+      <span class="f-val" id="f-area">—</span>
+      <span class="f-op">m² ×</span>
+      <span class="f-val" id="f-thick">—</span>
+      <span class="f-op">cm ×</span>
+      <span class="f-val" id="f-dens">2.40</span>
+      <span class="f-op">t/m³ ÷ 100 =</span>
+      <span class="f-result" id="f-result">— t</span>
+    </div>
+
+    <!-- WYNIK BAZOWY -->
+    <div class="result-box" id="result-box">
+      <span class="result-label">Wynik bazowy</span>
+      <div style="display:flex; align-items:baseline; gap:6px;">
+        <span class="result-value" id="result-val">—</span>
+        <span class="result-unit">t</span>
+      </div>
+    </div>
+
+    <!-- NADDATEK % -->
+    <div>
+      <div class="section-label">Naddatek</div>
+      <div class="naddatek-card">
+        <div class="naddatek-title">Wybierz naddatek</div>
+
+        <!-- +5% -->
+        <div class="checkbox-row" id="row-5" onclick="toggleCheck(5)">
+          <div class="cb-left">
+            <div class="cb-box" id="cb-5"><span class="cb-check">✓</span></div>
+            <span class="cb-label">+ 5%</span>
+          </div>
+          <span class="cb-result hidden" id="res-5">—</span>
+        </div>
+
+        <!-- +10% -->
+        <div class="checkbox-row" id="row-10" onclick="toggleCheck(10)">
+          <div class="cb-left">
+            <div class="cb-box" id="cb-10"><span class="cb-check">✓</span></div>
+            <span class="cb-label">+ 10%</span>
+          </div>
+          <span class="cb-result hidden" id="res-10">—</span>
+        </div>
+
+        <!-- Własny % -->
+        <div class="custom-row">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div class="cb-box" id="cb-custom" onclick="toggleCheck('custom')"><span class="cb-check">✓</span></div>
+            <span class="cb-label">Własny %</span>
+            <span class="custom-result hidden" id="res-custom">—</span>
+          </div>
+          <div class="custom-input-row">
+            <input class="custom-pct-input" type="number" id="custom-pct" placeholder="0" min="0" max="100" oninput="calculate()">
+            <span class="pct-sign">%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUMA KOŃCOWA -->
+    <div class="suma-card" id="suma-card">
+      <div class="suma-breakdown" id="suma-breakdown">
+        <div class="suma-line">
+          <span class="suma-line-label">Wynik bazowy</span>
+          <span class="suma-line-val" id="suma-base">— t</span>
+        </div>
+        <div class="suma-line" id="suma-extra-line" style="display:none">
+          <span class="suma-line-label" id="suma-extra-label">+ 0%</span>
+          <span class="suma-line-val" id="suma-extra-val">— t</span>
+        </div>
+      </div>
+      <div class="suma-divider"></div>
+      <div class="suma-total-row">
+        <span class="suma-total-label">Razem</span>
+        <div style="display:flex; align-items:baseline;">
+          <span class="suma-total-val" id="suma-total">—</span>
+          <span class="suma-total-unit">t</span>
+        </div>
+      </div>
+      <div class="suma-formula-text" id="suma-formula-text">— t + —% = — t</div>
+    </div>
+
+    <!-- RESET -->
+    <button class="btn-reset" onclick="resetAll()">↺ Wyczyść kalkulator</button>
+
+  </div><!-- /scroll -->
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="nav-item"><div class="nav-icon">⊞</div><div class="nav-label">Dashboard</div></div>
+    <div class="nav-item"><div class="nav-icon">👥</div><div class="nav-label">Ekipa</div></div>
+    <div class="nav-item"><div class="nav-icon">📍</div><div class="nav-label">Baustellen</div></div>
+    <div class="nav-item active"><div class="nav-icon">🧮</div><div class="nav-label">Kalkulator</div><div class="nav-dot"></div></div>
+    <div class="nav-item"><div class="nav-icon">📊</div><div class="nav-label">Raporty</div></div>
+  </div>
+
+</div><!-- /phone -->
+
+<script>
+  let density = 2.40;
+  let baseResult = 0;
+  let activeCheck = null; // null | 5 | 10 | 'custom'
+
+  // ── Gęstość ───────────────────────────────────────────
+  function toggleEdit() {
+    const el = document.getElementById('edit-mode');
+    el.classList.toggle('visible');
+  }
+
+  function saveDensity() {
+    const val = parseFloat(document.getElementById('density-input').value);
+    if (!isNaN(val) && val > 0) {
+      density = val;
+      document.getElementById('density-display').textContent = val.toFixed(2);
+      document.getElementById('f-dens').textContent = val.toFixed(2);
+    }
+    document.getElementById('edit-mode').classList.remove('visible');
+    calculate();
+  }
+
+  // ── Checkboxy ─────────────────────────────────────────
+  function toggleCheck(id) {
+    if (activeCheck === id) {
+      activeCheck = null;
+    } else {
+      activeCheck = id;
+    }
+    updateCheckboxes();
+    calculate();
+  }
+
+  function updateCheckboxes() {
+    [5, 10, 'custom'].forEach(id => {
+      const box = document.getElementById(`cb-${id}`);
+      const row = document.getElementById(`row-${id}`) || document.getElementById('cb-custom')?.closest('.custom-row');
+      const isActive = activeCheck === id;
+      box.classList.toggle('checked', isActive);
+      if (row) row.classList.toggle('checked', isActive);
+    });
+  }
+
+  // ── Kalkulacja ────────────────────────────────────────
+  function calculate() {
+    const area = parseFloat(document.getElementById('area').value) || 0;
+    const thickness = parseFloat(document.getElementById('thickness').value) || 0;
+    const customPct = parseFloat(document.getElementById('custom-pct').value) || 0;
+
+    // formula: m² × cm × t/m³ / 100
+    baseResult = area * thickness * density / 100;
+    const hasBase = area > 0 && thickness > 0;
+
+    // Formula preview
+    document.getElementById('f-area').textContent = area || '—';
+    document.getElementById('f-thick').textContent = thickness || '—';
+    document.getElementById('f-result').textContent = hasBase ? baseResult.toFixed(3) + ' t' : '— t';
+
+    // Base result box
+    document.getElementById('result-val').textContent = hasBase ? baseResult.toFixed(3) : '—';
+
+    // Per-checkbox results
+    const pct5 = baseResult * 0.05;
+    const pct10 = baseResult * 0.10;
+    const pctCustom = baseResult * (customPct / 100);
+
+    document.getElementById('res-5').textContent = hasBase ? `+${pct5.toFixed(3)} t` : '—';
+    document.getElementById('res-10').textContent = hasBase ? `+${pct10.toFixed(3)} t` : '—';
+    document.getElementById('res-custom').textContent = (hasBase && customPct > 0) ? `+${pctCustom.toFixed(3)} t` : '—';
+
+    // Show/hide cb results
+    ['5','10','custom'].forEach(id => {
+      const el = document.getElementById(`res-${id}`);
+      el.classList.toggle('hidden', !hasBase);
+    });
+
+    // Suma końcowa
+    let extra = 0;
+    let extraLabel = '';
+    let extraPct = 0;
+    if (activeCheck === 5) { extra = pct5; extraLabel = '+ 5%'; extraPct = 5; }
+    else if (activeCheck === 10) { extra = pct10; extraLabel = '+ 10%'; extraPct = 10; }
+    else if (activeCheck === 'custom' && customPct > 0) { extra = pctCustom; extraLabel = `+ ${customPct}%`; extraPct = customPct; }
+
+    const total = baseResult + extra;
+    const hasExtra = activeCheck !== null && (activeCheck !== 'custom' || customPct > 0);
+
+    document.getElementById('suma-base').textContent = hasBase ? baseResult.toFixed(3) + ' t' : '— t';
+    document.getElementById('suma-total').textContent = hasBase ? total.toFixed(3) : '—';
+
+    const extraLine = document.getElementById('suma-extra-line');
+    if (hasBase && hasExtra) {
+      extraLine.style.display = 'flex';
+      document.getElementById('suma-extra-label').textContent = extraLabel;
+      document.getElementById('suma-extra-val').textContent = '+' + extra.toFixed(3) + ' t';
+    } else {
+      extraLine.style.display = 'none';
+    }
+
+    // Formula string
+    if (hasBase) {
+      const formulaText = hasExtra
+        ? `${baseResult.toFixed(3)} t + ${extraPct}% (${extra.toFixed(3)} t) = ${total.toFixed(3)} t`
+        : `${baseResult.toFixed(3)} t`;
+      document.getElementById('suma-formula-text').textContent = formulaText;
+    } else {
+      document.getElementById('suma-formula-text').textContent = '— t + —% = — t';
+    }
+  }
+
+  // ── Reset ─────────────────────────────────────────────
+  function resetAll() {
+    document.getElementById('area').value = '';
+    document.getElementById('thickness').value = '';
+    document.getElementById('custom-pct').value = '';
+    activeCheck = null;
+    baseResult = 0;
+    updateCheckboxes();
+    calculate();
+  }
+
+  // Init
+  calculate();
+</script>
+</body>
+</html>

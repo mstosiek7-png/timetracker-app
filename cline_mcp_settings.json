@@ -1,0 +1,56 @@
+{
+  "mcpServers": {
+    "github.com/supabase-community/supabase-mcp": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?read_only=true&project_ref=dvikqvpvbqlfdriwutto",
+      
+      "autoApprove": []
+    },
+    
+    "github.com/modelcontextprotocol/servers/tree/main/src/filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "${workspaceFolder}"]
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://postgres:${DB_PASSWORD}@db.${PROJECT_REF}.supabase.co:5432/postgres"]
+    },
+    "github.com/executeautomation/mcp-playwright": {
+      "command": "npx",
+      "args": ["-y", "@executeautomation/playwright-mcp-server"],
+      
+      "autoApprove": []
+    },
+    "github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      
+      "autoApprove": []
+    },
+    "github.com/modelcontextprotocol/servers/tree/main/src/memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory", "${workspaceFolder}/.cline/memory-bank"],
+      
+      "autoApprove": []
+    }
+  },
+  "customInstructions": "# TimeTracker Project Instructions\n\n## Project Context\nYou are working on TimeTracker - a mobile time tracking application for construction workers built with React Native, Expo, and Supabase.\n\n## Key Technologies\n- React Native + Expo (cross-platform mobile)\n- TypeScript (strict mode)\n- Supabase (PostgreSQL, Auth, Storage, Realtime)\n- Zustand (local state) + React Query (server state)\n- Expo Camera + OCR for document scanning\n\n## Development Principles\n1. **Service Layer First**: All database operations through services/, never direct Supabase calls from components\n2. **Type Safety**: Always use TypeScript, regenerate database types after schema changes\n3. **Offline-First**: Queue operations in sync_queue when offline\n4. **Audit Everything**: Use triggers for automatic change history logging\n5. **Performance**: Memoize expensive operations, use React Query cache\n\n## File Organization\n- `/app` - Expo Router screens (navigation)\n- `/components` - Reusable UI components\n- `/services` - Business logic and API calls\n- `/stores` - Zustand stores for UI state\n- `/hooks` - Custom React hooks (mostly React Query)\n- `/types` - TypeScript definitions\n- `/supabase/migrations` - Database migrations\n- `/supabase/functions` - Edge functions\n\n## Common Commands\n```bash\n# Start dev server\nnpx expo start\n\n# Generate Supabase types\nsupabase gen types typescript --local > types/database.types.ts\n\n# Create migration\nsupabase migration new feature_name\n\n# Apply migrations\nsupabase db push\n\n# Deploy edge function\nsupabase functions deploy function_name\n```\n\n## Database Schema (Core Tables)\n- **employees**: Worker records (id, name, position, active)\n- **time_entries**: Time tracking (id, employee_id, date, hours, status)\n- **change_history**: Audit log (automatic via triggers)\n- **documents**: Scanned docs with OCR (id, file_path, ocr_text, ocr_data)\n- **sync_queue**: Offline sync queue\n\n## Code Patterns\n\n### Service Pattern\n```typescript\nexport const employeeService = {\n  async getAll(): Promise<Employee[]> {\n    const { data, error } = await supabase\n      .from('employees')\n      .select('*')\n      .eq('active', true);\n    if (error) throw error;\n    return data;\n  },\n};\n```\n\n### React Query Hook Pattern\n```typescript\nexport const useEmployees = () => {\n  return useQuery({\n    queryKey: ['employees'],\n    queryFn: employeeService.getAll,\n  });\n};\n```\n\n### Component Pattern\n```typescript\nexport const EmployeeCard: React.FC<Props> = ({ employee }) => {\n  return (\n    <View style={styles.container}>\n      <Text style={styles.name}>{employee.name}</Text>\n    </View>\n  );\n};\n```\n\n## Before Committing\n- [ ] Run TypeScript check: `npx tsc --noEmit`\n- [ ] Regenerate types if schema changed\n- [ ] Test on both iOS and Android if UI changes\n- [ ] Add appropriate error handling\n- [ ] Consider offline mode implications\n\n## Helpful Resources\n- Supabase Docs: https://supabase.com/docs\n- Expo Docs: https://docs.expo.dev\n- React Query: https://tanstack.com/query/latest\n\n## Current Focus\nYou are building a mobile time tracking system with OCR document scanning for construction workers. Prioritize:\n1. Offline-first architecture\n2. Simple, fast UI for field use\n3. Reliable data sync\n4. Audit trail for all changes\n",
+  "skills": [
+    {
+      "name": "timetracker-rn-dev",
+      "path": "./cline-skills/timetracker/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "timetracker-supabase",
+      "path": "./cline-skills/timetracker-supabase/SKILL.md",
+      "enabled": true
+    }
+  ],
+  "apiConfiguration": {
+    "anthropic": {
+      "apiKey": "${ANTHROPIC_API_KEY}",
+      "model": "claude-sonnet-4-20250514"
+    }
+  }
+}
