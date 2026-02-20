@@ -132,8 +132,11 @@ const CalculatorScreen = () => {
         title=""
       />
 
-      <View 
+      <ScrollView 
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Density Card */}
         <View style={styles.section}>
@@ -413,7 +416,7 @@ const CalculatorScreen = () => {
         </TouchableOpacity>
 
         <View style={styles.bottomSpacer} />
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
@@ -425,6 +428,8 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     paddingTop: 0,
     paddingLeft: theme.spacing.md,
     paddingRight: theme.spacing.md,
@@ -783,7 +788,7 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
   },
   bottomSpacer: {
-    height: 40,
+    height: 100,
   },
 });
 
