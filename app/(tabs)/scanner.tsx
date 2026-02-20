@@ -28,7 +28,7 @@ import {
 } from '../../hooks/useOCR';
 import { Document } from '../../types/models';
 import { theme } from '../../constants/theme';
-import { Card, PageHeader, SectionTitle, FAB } from '../../components/ui';
+import { Card, PageHeader, SectionTitle, FAB } from '../../components/ui/index';
 
 // Types
 type ScanSource = 'camera' | 'gallery';

@@ -13,6 +13,17 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { supabase } from '@/services/supabase';
 import { Session } from '@supabase/supabase-js';
+import { useFonts } from 'expo-font';
+import {
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_600SemiBold,
+  DMSans_700Bold,
+} from '@expo-google-fonts/dm-sans';
+import {
+  DMMono_400Regular,
+  DMMono_500Medium,
+} from '@expo-google-fonts/dm-mono';
 
 // React Query client configuration
 const queryClient = new QueryClient({
@@ -98,6 +109,25 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_600SemiBold,
+    DMSans_700Bold,
+    DMMono_400Regular,
+    DMMono_500Medium,
+    // alias used in theme/tokens.ts
+    DMMono_700Bold: DMMono_500Medium,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <PaperProvider theme={theme}>

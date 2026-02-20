@@ -25,7 +25,7 @@ import { useEmployees } from '../../hooks/useEmployees';
 import { useMonthlySummary } from '../../hooks/useTimeEntries';
 import { TimeEntryStatus } from '../../types/models';
 import { theme, StatusType } from '../../constants/theme';
-import { Card, PageHeader, SectionTitle, StatBox, StatusBadge } from '../../components/ui';
+import { Card, PageHeader, SectionTitle, StatBox, StatusBadge } from '../../components/ui/index';
 import { formatHours } from '../../utils/formatting';
 
 // =====================================================
