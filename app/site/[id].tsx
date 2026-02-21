@@ -137,14 +137,13 @@ export default function SiteDetailScreen() {
           onPress: () => {
             deleteMutation.mutate(siteId, {
               onSuccess: () => {
+                // Remove immediately from baustellen cache
+                queryClient.setQueryData(['baustellen'], (old: any[] | undefined) =>
+                  old ? old.filter((s: any) => s.id !== siteId) : old
+                );
                 queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
                 queryClient.invalidateQueries({ queryKey: ['site-statistics'] });
-                Alert.alert('Sukces', 'Budowa została usunięta', [
-                  {
-                    text: 'OK',
-                    onPress: () => router.back(),
-                  },
-                ]);
+                router.back();
               },
               onError: (error) => {
                 console.error('Błąd usuwania budowy:', error);

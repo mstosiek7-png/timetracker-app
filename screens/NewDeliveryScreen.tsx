@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import { BarCodeScanner } from 'expo-barcode-scanner';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { AppHeader, PrimaryButton, BottomNav } from '../components/ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius } from '../theme';
 import { useBaustellen } from '../hooks/useBaustellen';

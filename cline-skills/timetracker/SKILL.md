@@ -648,6 +648,48 @@ Przed commitem sprawdź:
 - [ ] Database indexes present (if new queries)
 - [ ] Performance tested (for lists >100 items)
 
+---
+
+## Critical Fixes & Lessons Learned (2026-02-21)
+
+### React Query Cache Management
+**Problem**: `invalidateQueries()` only marks data as stale, doesn't remove from cache immediately.
+**Solution**: Use `setQueryData()` for instant cache updates:
+```typescript
+queryClient.setQueryData(['queryKey'], (old) => 
+  old ? old.filter(item => item.id !== deletedId) : old
+);
+```
+**Where this matters**: Delete operations, instant UI feedback.
+
+### Dual Route Handling for Site Detail
+**Note**: The app has TWO site detail implementations:
+- `screens/SiteDetailScreen.tsx` (legacy, uses `useBaustellen` hook)
+- `app/site/[id].tsx` (current, Expo Router, direct mutations)
+
+**When updating delete logic**: Update BOTH files with `setQueryData(['baustellen'], ...)` to keep list in sync.
+
+### Status Badge Calendar View
+Instead of tiny colored dots (4×4px):
+- Use readable abbreviations: **P** (Praca), **C** (Chorobowe), **U** (Urlop), **F** (FZA)
+- Display hours only for work entries: `workHours = entries.filter(e => e.status === 'work').reduce(...)`
+
+### Conditional Hours Input
+- Always show **status selection FIRST**
+- Wrap hours input: `{status === 'work' && (<HoursFields />)}`
+- Set hours to 0 on submit for non-work statuses
+- Apply across: `TimeEntryForm`, `AddEntryModal`, `BulkEntryModal`
+
+### Supabase RLS Policies
+Missing DELETE policies can silently fail (no error, just no delete):
+```sql
+CREATE POLICY "Enable delete for anon" ON construction_sites
+  FOR DELETE TO anon USING (true);
+```
+File: `supabase/migrations/20260221000000_construction_sites_delete.sql`
+
+---
+
 ## Best Practices Summary
 
 1. **Always use TypeScript** - No `any` types unless absolutely necessary

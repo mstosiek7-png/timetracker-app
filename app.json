@@ -21,7 +21,11 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "package": "com.tiftek.timetrackermobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -29,8 +33,13 @@
     "plugins": [
       "@react-native-community/datetimepicker",
       "expo-router",
-      "expo-font",
-      "expo-barcode-scanner"
-    ]
+      "expo-font"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9d704e45-b8b6-45ae-9fd9-57d9716fb0d7"
+      }
+    }
   }
 }
