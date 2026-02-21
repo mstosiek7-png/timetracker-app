@@ -52,7 +52,7 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
     }
   }, [entryId, existingEntry, visible]);
 
-  const totalHours = Math.max(0, (endTime.getTime() - startTime.getTime()) / 3600000);
+  const totalHours = status === 'Praca' ? Math.max(0, (endTime.getTime() - startTime.getTime()) / 3600000) : 0;
 
   const formatTime = (d: Date) =>
     d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
@@ -136,32 +136,6 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
               )}
             </View>
 
-            {/* ─── Hours ───────────────────────────────── */}
-            <View style={styles.section}>
-              <Text style={styles.label}>Godziny pracy *</Text>
-              <View style={styles.timeRow}>
-                <TouchableOpacity style={styles.timeBtn} onPress={() => setShowStartPicker(true)}>
-                  <Text style={styles.timeBtnIcon}>🕐</Text>
-                  <Text style={styles.timeBtnText}>{formatTime(startTime)}</Text>
-                </TouchableOpacity>
-                <Text style={styles.timeSep}>→</Text>
-                <TouchableOpacity style={styles.timeBtn} onPress={() => setShowEndPicker(true)}>
-                  <Text style={styles.timeBtnIcon}>🕐</Text>
-                  <Text style={styles.timeBtnText}>{formatTime(endTime)}</Text>
-                </TouchableOpacity>
-                <Text style={styles.totalHours}>{totalHours.toFixed(0)}h</Text>
-              </View>
-              <Text style={styles.timeHint}>Godziny obliczane są automatycznie</Text>
-              {showStartPicker && (
-                <DateTimePicker value={startTime} mode="time" is24Hour
-                  onChange={(_, d) => { setShowStartPicker(false); if (d) setStartTime(d); }} />
-              )}
-              {showEndPicker && (
-                <DateTimePicker value={endTime} mode="time" is24Hour
-                  onChange={(_, d) => { setShowEndPicker(false); if (d) setEndTime(d); }} />
-              )}
-            </View>
-
             {/* ─── Status ──────────────────────────────── */}
             <View style={styles.section}>
               <Text style={styles.label}>Status *</Text>
@@ -171,6 +145,34 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
                 ))}
               </View>
             </View>
+
+            {/* ─── Hours (tylko dla Pracy) ───────────────────────────────── */}
+            {status === 'Praca' && (
+              <View style={styles.section}>
+                <Text style={styles.label}>Godziny pracy *</Text>
+                <View style={styles.timeRow}>
+                  <TouchableOpacity style={styles.timeBtn} onPress={() => setShowStartPicker(true)}>
+                    <Text style={styles.timeBtnIcon}>🕐</Text>
+                    <Text style={styles.timeBtnText}>{formatTime(startTime)}</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.timeSep}>→</Text>
+                  <TouchableOpacity style={styles.timeBtn} onPress={() => setShowEndPicker(true)}>
+                    <Text style={styles.timeBtnIcon}>🕐</Text>
+                    <Text style={styles.timeBtnText}>{formatTime(endTime)}</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.totalHours}>{totalHours.toFixed(0)}h</Text>
+                </View>
+                <Text style={styles.timeHint}>Godziny obliczane są automatycznie</Text>
+                {showStartPicker && (
+                  <DateTimePicker value={startTime} mode="time" is24Hour
+                    onChange={(_, d) => { setShowStartPicker(false); if (d) setStartTime(d); }} />
+                )}
+                {showEndPicker && (
+                  <DateTimePicker value={endTime} mode="time" is24Hour
+                    onChange={(_, d) => { setShowEndPicker(false); if (d) setEndTime(d); }} />
+                )}
+              </View>
+            )}
 
             <View style={{ height: Spacing.xxxl }} />
           </ScrollView>

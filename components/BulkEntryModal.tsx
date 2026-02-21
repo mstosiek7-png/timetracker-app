@@ -30,12 +30,19 @@ export function BulkEntryModal({ visible, onClose }: Props) {
   const { workers } = useWorkers();
   const createBulkEntries = useCreateBulkTimeEntries();
 
-  const [defaultHours, setDefaultHours] = useState('8');
+  const [defaultStartTime, setDefaultStartTime] = useState(new Date(new Date().setHours(8, 0, 0, 0)));
+  const [defaultEndTime, setDefaultEndTime] = useState(new Date(new Date().setHours(16, 0, 0, 0)));
   const [defaultStatus, setDefaultStatus] = useState('Praca');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  
+  // Calculate default hours from time range
+  const defaultHours = defaultStatus === 'Praca' ? Math.max(0, (defaultEndTime.getTime() - defaultStartTime.getTime()) / 3600000) : 0;
+  
   const [rows, setRows] = useState<WorkerRow[]>(() =>
-    workers.map(w => ({ id: w.id, firstName: w.firstName, lastName: w.lastName, checked: true, hours: '8', status: 'Praca' }))
+    workers.map(w => ({ id: w.id, firstName: w.firstName, lastName: w.lastName, checked: true, hours: defaultHours.toFixed(2), status: 'Praca' }))
   );
 
   // Sync rows when workers change
@@ -43,12 +50,12 @@ export function BulkEntryModal({ visible, onClose }: Props) {
     if (workers.length === 0) return;
     setRows(workers.map(w => ({
       id: w.id, firstName: w.firstName, lastName: w.lastName,
-      checked: true, hours: defaultHours, status: defaultStatus,
+      checked: true, hours: defaultHours.toFixed(2), status: defaultStatus,
     })));
   }, [workers]); // workers is memoized in useWorkers — safe as dep
 
   const applyToAll = useCallback(() => {
-    setRows(prev => prev.map(r => r.checked ? { ...r, hours: defaultHours, status: defaultStatus } : r));
+    setRows(prev => prev.map(r => r.checked ? { ...r, hours: defaultHours.toFixed(2), status: defaultStatus } : r));
   }, [defaultHours, defaultStatus]);
 
   const toggleAll = (checked: boolean) => {
@@ -63,19 +70,27 @@ export function BulkEntryModal({ visible, onClose }: Props) {
 
   const formatDate = (d: Date) =>
     d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  
+  const formatTime = (d: Date) =>
+    d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
 
   const STATUS_DB: Record<string, string> = { 'Praca': 'work', 'Chorobowe': 'sick', 'Urlop': 'vacation', 'FZA': 'fza' };
 
   async function handleSave() {
     const entries = rows
       .filter(r => r.checked)
-      .map(r => ({
-        employee_id: r.id,
-        date: date.toISOString().split('T')[0],
-        hours: parseFloat(r.hours) || 0,
-        status: (STATUS_DB[r.status] ?? 'work') as any,
-        notes: null,
-      }));
+      .map(r => {
+        // Calculate hours based on status - only for "Praca"
+        const statusVal = STATUS_DB[r.status] ?? 'work';
+        const hoursVal = statusVal === 'work' ? parseFloat(r.hours) || 0 : 0;
+        return {
+          employee_id: r.id,
+          date: date.toISOString().split('T')[0],
+          hours: hoursVal,
+          status: statusVal as any,
+          notes: null,
+        };
+      });
     await createBulkEntries.mutateAsync(entries);
     onClose();
   }
@@ -95,17 +110,8 @@ export function BulkEntryModal({ visible, onClose }: Props) {
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* ─── Default settings ──────────────────── */}
             <Text style={styles.sectionTitle}>Ustawienia domyślne</Text>
+            
             <View style={styles.defaultsRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Domyślne godziny</Text>
-                <TextInput
-                  style={styles.defaultHoursInput}
-                  value={defaultHours}
-                  onChangeText={setDefaultHours}
-                  keyboardType="numeric"
-                  maxLength={3}
-                />
-              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Domyślny status</Text>
                 <View style={styles.defaultStatusGroup}>
@@ -122,6 +128,35 @@ export function BulkEntryModal({ visible, onClose }: Props) {
                 </View>
               </View>
             </View>
+
+            {/* ─── Godziny pracy (tylko dla Praca) */}
+            {defaultStatus === 'Praca' && (
+              <View style={styles.defaultsRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Godziny pracy *</Text>
+                  <View style={styles.timeRow}>
+                    <TouchableOpacity style={styles.timeBtn} onPress={() => setShowStartPicker(true)}>
+                      <Text style={styles.timeBtnIcon}>🕐</Text>
+                      <Text style={styles.timeBtnText}>{formatTime(defaultStartTime)}</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.timeSep}>→</Text>
+                    <TouchableOpacity style={styles.timeBtn} onPress={() => setShowEndPicker(true)}>
+                      <Text style={styles.timeBtnIcon}>🕐</Text>
+                      <Text style={styles.timeBtnText}>{formatTime(defaultEndTime)}</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.totalHours}>{defaultHours.toFixed(1)}h</Text>
+                  </View>
+                  {showStartPicker && (
+                    <DateTimePicker value={defaultStartTime} mode="time" is24Hour
+                      onChange={(_, d) => { setShowStartPicker(false); if (d) setDefaultStartTime(d); }} />
+                  )}
+                  {showEndPicker && (
+                    <DateTimePicker value={defaultEndTime} mode="time" is24Hour
+                      onChange={(_, d) => { setShowEndPicker(false); if (d) setDefaultEndTime(d); }} />
+                  )}
+                </View>
+              </View>
+            )}
             <TouchableOpacity style={styles.applyBtn} onPress={applyToAll}>
               <Text style={styles.applyBtnText}>↓ Zastosuj do wszystkich</Text>
             </TouchableOpacity>
@@ -158,7 +193,7 @@ export function BulkEntryModal({ visible, onClose }: Props) {
               <View style={styles.tableHead}>
                 <Text style={[styles.th, { width: 40 }]}>Wybór</Text>
                 <Text style={[styles.th, { flex: 1 }]}>Pracownik</Text>
-                <Text style={[styles.th, { width: 70 }]}>Godz.</Text>
+                {defaultStatus === 'Praca' && <Text style={[styles.th, { width: 70 }]}>Godz.</Text>}
                 <Text style={[styles.th, { width: 90 }]}>Status</Text>
               </View>
 
@@ -173,17 +208,19 @@ export function BulkEntryModal({ visible, onClose }: Props) {
                     <Text style={styles.rowName}>{row.firstName}</Text>
                     <Text style={styles.rowRole}>{row.lastName}</Text>
                   </View>
-                  {/* Hours input */}
-                  <View style={{ width: 70 }}>
-                    <TextInput
-                      style={styles.hoursInput}
-                      value={row.hours}
-                      onChangeText={v => updateRow(row.id, { hours: v })}
-                      keyboardType="numeric"
-                      maxLength={4}
-                      editable={row.checked}
-                    />
-                  </View>
+                  {/* Hours input - tylko dla Praca */}
+                  {defaultStatus === 'Praca' && (
+                    <View style={{ width: 70 }}>
+                      <TextInput
+                        style={styles.hoursInput}
+                        value={row.hours}
+                        onChangeText={v => updateRow(row.id, { hours: v })}
+                        keyboardType="numeric"
+                        maxLength={4}
+                        editable={row.checked && row.status === 'Praca'}
+                      />
+                    </View>
+                  )}
                   {/* Status mini-chips */}
                   <View style={{ width: 90 }}>
                     {STATUSES.map(s => (
@@ -207,12 +244,12 @@ export function BulkEntryModal({ visible, onClose }: Props) {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <OutlineButton label="Anuluj" onPress={onClose} style={{ flex: 1 }} />
+            <OutlineButton label="Anuluj" onPress={onClose} style={{ flex: 1, minHeight: 52 }} />
             <PrimaryButton
               label={`✓ Zapisz (${selectedCount})`}
               onPress={handleSave}
               disabled={selectedCount === 0}
-              style={{ flex: 2 }}
+              style={{ flex: 1, minHeight: 52 }}
             />
           </View>
         </View>
@@ -246,7 +283,21 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: FontSize.lg, fontFamily: FontFamily.bold, color: Colors.black, marginTop: Spacing.xl, marginBottom: Spacing.md },
   section: { marginTop: Spacing.xl },
   label: { fontSize: FontSize.xs, fontFamily: FontFamily.semiBold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.sm },
-  defaultsRow: { flexDirection: 'row', gap: 12 },
+  defaultsRow: { flexDirection: 'row', gap: 12, marginBottom: Spacing.md },
+  timeRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  timeBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 12,
+    backgroundColor: Colors.cream, borderRadius: Radius.sm,
+    borderWidth: 1.5, borderColor: Colors.creamDark,
+    gap: 6,
+  },
+  timeBtnIcon: { fontSize: 18 },
+  timeBtnText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.orange },
+  timeSep: { fontSize: 18, color: Colors.grayMid, fontFamily: FontFamily.bold },
+  totalHours: { fontSize: FontSize.xl, fontFamily: 'DMMono_700Bold', color: Colors.orange, minWidth: 44, textAlign: 'right' },
   defaultHoursInput: {
     backgroundColor: Colors.cream, borderRadius: Radius.sm,
     borderWidth: 1.5, borderColor: Colors.creamDark,
@@ -319,5 +370,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', gap: 10,
     paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg,
     borderTopWidth: 1, borderTopColor: Colors.creamDark,
+    justifyContent: 'center', alignItems: 'center',
   },
 });

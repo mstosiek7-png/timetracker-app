@@ -10,6 +10,12 @@ import {
   writeAsStringAsync,
   EncodingType,
 } from 'expo-file-system/legacy';
+import { 
+  generateExcelReport, 
+  generatePdfReport, 
+  shareReport,
+  ExportOptions
+} from '../services/export';
 
 export interface ReportStats {
   totalHours: number;
@@ -27,6 +33,7 @@ export interface SavedReport {
   id: string;
   name: string;
   createdAt: string;
+  uri?: string;
 }
 
 const STATUS_MAP: Record<string, keyof ReportStats['byStatus']> = {
@@ -118,47 +125,60 @@ export function useReports() {
     format: 'xlsx' | 'pdf';
     includeNotes: boolean;
   }): Promise<void> {
-    // Fetch entries
-    let query = supabase
-      .from('time_entries')
-      .select('*, employees(name, position)')
-      .gte('date', format(dateFrom, 'yyyy-MM-dd'))
-      .lte('date', format(dateTo, 'yyyy-MM-dd'))
-      .order('date', { ascending: true });
+    try {
+      // Prepare export options
+      const exportOptions: ExportOptions = {
+        startDate: dateFrom,
+        endDate: dateTo,
+        employeeIds: workerIds.length > 0 ? workerIds : undefined,
+        includeNotes,
+        format: fmt === 'xlsx' ? 'excel' : 'pdf'
+      };
 
-    if (workerIds.length > 0) {
-      query = query.in('employee_id', workerIds);
-    }
+      // Generate the appropriate format
+      let fileUri: string;
+      if (fmt === 'xlsx') {
+        fileUri = await generateExcelReport(exportOptions);
+        console.log('Excel report generated:', fileUri);
+      } else {
+        fileUri = await generatePdfReport(exportOptions);
+        console.log('PDF report generated:', fileUri);
+      }
 
-    const { data: entries, error } = await query;
-    if (error) throw error;
-
-    // Generate CSV as basic export
-    const from = format(dateFrom, 'ddMMyyyy');
-    const to   = format(dateTo,   'ddMMyyyy');
-    const name = `raport_${from}-${to}`;
-
-    const lines = [
-      'Pracownik;Data;Godziny;Status' + (includeNotes ? ';Notatki' : ''),
-      ...(entries ?? []).map(e => {
-        const empName = (Array.isArray(e.employees) ? e.employees[0]?.name : e.employees?.name) ?? '';
-        const row = [empName, e.date, e.hours, e.status];
-        if (includeNotes) row.push(e.notes ?? '');
-        return row.join(';');
-      }),
-    ];
-    const csv = lines.join('\n');
-
-    if (documentDirectory) {
-      const path = `${documentDirectory}${name}.csv`;
-      await writeAsStringAsync(path, csv, { encoding: EncodingType.UTF8 });
-
+      // Add to saved reports list first
+      const fileName = fileUri.split('/').pop() || 'raport';
       setSavedReports(prev => [
-        { id: Date.now().toString(), name: `${name}.csv`, createdAt: new Date().toISOString() },
+        { 
+          id: Date.now().toString(), 
+          name: fileName, 
+          createdAt: new Date().toLocaleString('pl-PL'),
+          uri: fileUri
+        },
         ...prev,
       ]);
+
+      // Share the generated file - this opens the share dialog
+      console.log('Opening share dialog for:', fileUri);
+      await shareReport(fileUri);
+      console.log('Share dialog closed');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      throw error;
     }
   }
 
-  return { getStats, useReportStats, generateReport, savedReports };
+  // ─── shareExistingReport ──────────────────────────────────
+  async function shareExistingReport(report: SavedReport): Promise<void> {
+    try {
+      if (!report.uri) {
+        throw new Error('Report URI not found');
+      }
+      await shareReport(report.uri);
+    } catch (error) {
+      console.error('Error sharing report:', error);
+      throw error;
+    }
+  }
+
+  return { getStats, useReportStats, generateReport, shareExistingReport, savedReports };
 }

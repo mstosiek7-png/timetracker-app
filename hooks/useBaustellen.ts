@@ -170,9 +170,13 @@ export function useBaustellen() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['baustellen'] });
       queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
+      queryClient.invalidateQueries({ queryKey: ['site-deliveries', variables.siteId] });
+      queryClient.invalidateQueries({ queryKey: ['site-summary', variables.siteId] });
+      queryClient.invalidateQueries({ queryKey: ['construction-site', variables.siteId] });
+      queryClient.invalidateQueries({ queryKey: ['site-statistics'] });
     },
   });
 
@@ -193,15 +197,25 @@ export function useBaustellen() {
   // ─── Delete site ──────────────────────────────────────────
   const deleteSiteMutation = useMutation({
     mutationFn: async (id: string) => {
+      console.log('Deleting site:', id);
       const { error } = await supabase
         .from('construction_sites')
         .delete()
         .eq('id', id);
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
+      console.log('Delete successful');
+      return id; // Return ID for onSuccess
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['baustellen'] });
-      queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
+    onSuccess: (id: string) => {
+      console.log('Delete mutation success, removing from cache:', id);
+      // Remove from cache immediately
+      queryClient.setQueryData(['baustellen'], (oldData: Site[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.filter(s => s.id !== id);
+      });
     },
   });
 
@@ -213,6 +227,15 @@ export function useBaustellen() {
     getSite,
     addDelivery: addDeliveryMutation.mutateAsync,
     createSite: createSiteMutation.mutateAsync,
-    deleteSite: deleteSiteMutation.mutateAsync,
+    deleteSite: async (id: string) => {
+      try {
+        console.log('Starting delete for site:', id);
+        await deleteSiteMutation.mutateAsync(id);
+        console.log('Delete completed');
+      } catch (err) {
+        console.error('Error deleting site:', err);
+        throw err;
+      }
+    },
   };
 }

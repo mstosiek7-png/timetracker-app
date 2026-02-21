@@ -73,7 +73,8 @@ export default function TimeEntryForm({
       return;
     }
 
-    const calculatedHours = calculateHours();
+    // Oblicz godziny tylko dla wpisów "praca"
+    const calculatedHours = status === 'work' ? calculateHours() : 0;
     const formData: TimeEntryInsert = {
       employee_id: employeeId,
       date: format(date, 'yyyy-MM-dd'),
@@ -104,7 +105,8 @@ export default function TimeEntryForm({
     if (!date) {
       return false;
     }
-    if (startTime >= endTime) {
+    // Walidacja godzin tylko dla wpisów "praca"
+    if (status === 'work' && startTime >= endTime) {
       return false;
     }
     return true;
@@ -135,7 +137,7 @@ export default function TimeEntryForm({
   // Render
 // =====================================================
 
-  const isTimeValid = startTime < endTime;
+  const isTimeValid = status === 'work' ? startTime < endTime : true;
 
   const isFormValid = employeeId && date && isTimeValid;
 
@@ -194,67 +196,6 @@ export default function TimeEntryForm({
 
         <Divider style={styles.divider} />
 
-        {/* Godziny */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Godziny pracy *</Text>
-          <View style={styles.timeRangeContainer}>
-            <View style={styles.timeInputWrapper}>
-              <Text style={styles.timeLabel}>Od</Text>
-              <Button
-                mode="outlined"
-                onPress={() => setShowStartTimePicker(true)}
-                style={styles.timeButton}
-                icon="clock-in"
-              >
-                {format(startTime, 'HH:mm')}
-              </Button>
-              {showStartTimePicker && (
-                <DateTimePicker
-                  value={startTime}
-                  mode="time"
-                  display="spinner"
-                  onChange={onStartTimeChange}
-                />
-              )}
-            </View>
-
-            <View style={styles.timeInputWrapper}>
-              <Text style={styles.timeLabel}>Do</Text>
-              <Button
-                mode="outlined"
-                onPress={() => setShowEndTimePicker(true)}
-                style={styles.timeButton}
-                icon="clock-out"
-              >
-                {format(endTime, 'HH:mm')}
-              </Button>
-              {showEndTimePicker && (
-                <DateTimePicker
-                  value={endTime}
-                  mode="time"
-                  display="spinner"
-                  onChange={onEndTimeChange}
-                />
-              )}
-            </View>
-
-            <View style={styles.timeResultWrapper}>
-              <Text style={styles.timeLabel}>Razem</Text>
-              <Text style={styles.hoursResult}>{formatHours(calculateHours(), true)}</Text>
-            </View>
-          </View>
-          {startTime >= endTime && (
-            <HelperText type="error">
-              Godzina końcowa musi być późniejsza niż początkowa
-            </HelperText>
-          )}
-          <HelperText type="info">
-            Godziny obliczane są automatycznie
-          </HelperText>
-        </View>
-
-        <Divider style={styles.divider} />
-
         {/* Status */}
         <View style={styles.section}>
           <Text style={styles.label}>Status *</Text>
@@ -273,6 +214,71 @@ export default function TimeEntryForm({
         </View>
 
         <Divider style={styles.divider} />
+
+        {/* Godziny - tylko dla wpisów "praca" */}
+        {status === 'work' && (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.label}>Godziny pracy *</Text>
+              <View style={styles.timeRangeContainer}>
+                <View style={styles.timeInputWrapper}>
+                  <Text style={styles.timeLabel}>Od</Text>
+                  <Button
+                    mode="outlined"
+                    onPress={() => setShowStartTimePicker(true)}
+                    style={styles.timeButton}
+                    icon="clock-in"
+                  >
+                    {format(startTime, 'HH:mm')}
+                  </Button>
+                  {showStartTimePicker && (
+                    <DateTimePicker
+                      value={startTime}
+                      mode="time"
+                      display="spinner"
+                      onChange={onStartTimeChange}
+                    />
+                  )}
+                </View>
+
+                <View style={styles.timeInputWrapper}>
+                  <Text style={styles.timeLabel}>Do</Text>
+                  <Button
+                    mode="outlined"
+                    onPress={() => setShowEndTimePicker(true)}
+                    style={styles.timeButton}
+                    icon="clock-out"
+                  >
+                    {format(endTime, 'HH:mm')}
+                  </Button>
+                  {showEndTimePicker && (
+                    <DateTimePicker
+                      value={endTime}
+                      mode="time"
+                      display="spinner"
+                      onChange={onEndTimeChange}
+                    />
+                  )}
+                </View>
+
+                <View style={styles.timeResultWrapper}>
+                  <Text style={styles.timeLabel}>Razem</Text>
+                  <Text style={styles.hoursResult}>{formatHours(calculateHours(), true)}</Text>
+                </View>
+              </View>
+              {startTime >= endTime && (
+                <HelperText type="error">
+                  Godzina końcowa musi być późniejsza niż początkowa
+                </HelperText>
+              )}
+              <HelperText type="info">
+                Godziny obliczane są automatycznie
+              </HelperText>
+            </View>
+
+            <Divider style={styles.divider} />
+          </>
+        )}
 
         {/* Notatki */}
         <View style={styles.section}>

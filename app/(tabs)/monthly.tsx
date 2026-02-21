@@ -48,12 +48,12 @@ interface DayCell {
 // =====================================================
 
 export default function MonthlyViewScreen() {
-  // URL params — employeeId przekazywane po kliknięciu pracownika w dashboardzie
-  const { employeeId: paramEmployeeId } = useLocalSearchParams<{ employeeId?: string }>();
+  // URL params — workerId przekazywane po kliknięciu wpisu na dashboardzie
+  const { workerId: paramWorkerId } = useLocalSearchParams<{ workerId?: string }>();
 
   // State
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(paramEmployeeId ?? '');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(paramWorkerId ?? '');
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [viewMode, setViewMode] = useState<'calendar' | 'summary'>('calendar');
 
@@ -380,28 +380,48 @@ export default function MonthlyViewScreen() {
                             {format(day.date, 'd')}
                           </Text>
 
-                          {day.totalHours > 0 && (
+                          {day.entries.length > 0 && (
                             <View style={styles.dayEntries}>
-                              <Text style={styles.dayHours}>
-                                {formatHours(day.totalHours, true)}
-                              </Text>
-                              {day.entries.length > 0 && (
-                                <View style={styles.statusIndicators}>
-                                  {day.entries.map((entry, idx) => (
+                              {(() => {
+                                // Oblicz godziny tylko dla wpisów "work"
+                                const workHours = day.entries
+                                  .filter(e => e.status === 'work')
+                                  .reduce((sum, e) => sum + e.hours, 0);
+                                return workHours > 0 ? (
+                                  <Text style={styles.dayHours}>
+                                    {formatHours(workHours, true)}
+                                  </Text>
+                                ) : null;
+                              })()}
+                              <View style={styles.statusIndicators}>
+                                {day.entries.map((entry, idx) => {
+                                  const statusColor = theme.colors.statusColors[entry.status as StatusType];
+                                  const getStatusLabel = (status: TimeEntryStatus): string => {
+                                    const labels: Record<TimeEntryStatus, string> = {
+                                      work: 'P',
+                                      sick: 'C',
+                                      vacation: 'U',
+                                      fza: 'F',
+                                    };
+                                    return labels[status];
+                                  };
+                                  return (
                                     <View
                                       key={idx}
                                       style={[
-                                        styles.statusDot,
+                                        styles.statusBadge,
                                         {
-                                          backgroundColor:
-                                            theme.colors.statusColors[entry.status as StatusType]
-                                              ?.text ?? theme.colors.muted,
+                                          backgroundColor: statusColor?.text ?? theme.colors.muted,
                                         },
                                       ]}
-                                    />
-                                  ))}
-                                </View>
-                              )}
+                                    >
+                                      <Text style={styles.statusBadgeText}>
+                                        {getStatusLabel(entry.status)}
+                                      </Text>
+                                    </View>
+                                  );
+                                })}
+                              </View>
                             </View>
                           )}
                         </TouchableOpacity>
@@ -703,6 +723,7 @@ const styles = StyleSheet.create({
   dayEntries: {
     alignItems: 'center',
     marginTop: 2,
+    gap: 1,
   },
   dayHours: {
     fontSize: theme.fontSize.xs,
@@ -711,13 +732,22 @@ const styles = StyleSheet.create({
   },
   statusIndicators: {
     flexDirection: 'row',
-    marginTop: 2,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 2,
   },
-  statusDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    marginHorizontal: 1,
+  statusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    minWidth: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusBadgeText: {
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+    color: 'white',
   },
 
   // ── Detailed List ──

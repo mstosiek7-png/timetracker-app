@@ -91,13 +91,17 @@ async function fetchTimeEntry(id: string) {
 }
 
 /**
- * Tworzy nowy wpis czasu pracy
+ * Tworzy nowy wpis czasu pracy lub aktualizuje istniejący (upsert)
+ * Jeśli wpis dla danego pracownika i daty już istnieje, zostanie zaktualizowany
  */
 async function createTimeEntry(timeEntryData: TimeEntryInsert) {
   // created_by has DEFAULT auth.uid() in the database
   const { data, error } = await supabase
     .from('time_entries')
-    .insert(timeEntryData)
+    .upsert(timeEntryData, {
+      onConflict: 'employee_id,date',
+      ignoreDuplicates: false,
+    })
     .select('*, employees(*)')
     .single();
 
@@ -109,12 +113,16 @@ async function createTimeEntry(timeEntryData: TimeEntryInsert) {
 }
 
 /**
- * Tworzy wiele wpisów czasu pracy naraz (bulk insert)
+ * Tworzy wiele wpisów czasu pracy naraz lub aktualizuje istniejące (bulk upsert)
+ * Jeśli wpis dla danego pracownika i daty już istnieje, zostanie zaktualizowany
  */
 async function createBulkTimeEntries(timeEntriesData: TimeEntryInsert[]) {
   const { data, error } = await supabase
     .from('time_entries')
-    .insert(timeEntriesData)
+    .upsert(timeEntriesData, {
+      onConflict: 'employee_id,date',
+      ignoreDuplicates: false,
+    })
     .select('*, employees(*)');
 
   if (error) {

@@ -22,6 +22,10 @@ DROP POLICY IF EXISTS "Enable update for anon" ON construction_sites;
 CREATE POLICY "Enable update for anon" ON construction_sites
   FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Enable delete for anon" ON construction_sites;
+CREATE POLICY "Enable delete for anon" ON construction_sites
+  FOR DELETE TO anon USING (true);
+
 -- =====================================================
 -- ASPHALT_TYPES - polityki dla anon
 -- =====================================================

@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, StatusBar,
+  StyleSheet, StatusBar, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,12 +21,12 @@ type ExportFormat = 'xlsx' | 'pdf';
 
 export default function ReportsScreen({ navigation }: Props) {
   const { workers } = useWorkers();
-  const { useReportStats, generateReport, savedReports } = useReports();
+  const { useReportStats, generateReport, shareExistingReport, savedReports } = useReports();
 
   const [rangeMode, setRangeMode] = useState<RangeMode>('current');
   const [dateFrom, setDateFrom] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [dateTo, setDateTo]     = useState(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0));
-  const [selectedWorkers, setSelectedWorkers] = useState<string[]>([]); // pusty = wszyscy
+  const [selectedWorkers, setSelectedWorkers] = useState<string[]>(workers.map(w => w.id)); // domyślnie wszyscy zaznaczeni
   const [exportFormat, setExportFormat] = useState<ExportFormat>('xlsx');
   const [includeNotes, setIncludeNotes] = useState(false);
   const [showFromPicker, setShowFromPicker] = useState(false);
@@ -59,9 +59,23 @@ export default function ReportsScreen({ navigation }: Props) {
   async function handleGenerate() {
     setLoading(true);
     try {
-      await generateReport({ dateFrom, dateTo, workerIds: selectedWorkers, format: exportFormat, includeNotes });
+      // Jeśli selectedWorkers zawiera wszystkich pracowników, wyślij puste (oznacza: wszyscy)
+      const workersToFilter = selectedWorkers.length === workers.length ? [] : selectedWorkers;
+      await generateReport({ dateFrom, dateTo, workerIds: workersToFilter, format: exportFormat, includeNotes });
+      // Success message removed - share dialog will appear automatically
+    } catch (error) {
+      console.error('Generate report error:', error);
+      Alert.alert('Błąd', 'Nie udało się wygenerować raportu: ' + (error as Error).message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleShareReport(report: any) {
+    try {
+      await shareExistingReport(report);
+    } catch (error) {
+      Alert.alert('Błąd', 'Nie udało się udostępnić raportu: ' + (error as Error).message);
     }
   }
 
@@ -132,10 +146,10 @@ export default function ReportsScreen({ navigation }: Props) {
           <View style={styles.filterHeader}>
             <Text style={styles.cardTitle}>Pracownicy</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity onPress={() => setSelectedWorkers([])}>
-                <Text style={styles.filterAction}>Wszyscy</Text>
-              </TouchableOpacity>
               <TouchableOpacity onPress={() => setSelectedWorkers(workers.map(w => w.id))}>
+                <Text style={styles.filterAction}>Zaznacz wszystkich</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setSelectedWorkers([])}>
                 <Text style={styles.filterActionGray}>Wyczyść</Text>
               </TouchableOpacity>
             </View>
@@ -221,10 +235,17 @@ export default function ReportsScreen({ navigation }: Props) {
             <Text style={styles.emptyText}>Brak zapisanych raportów</Text>
           ) : (
             savedReports.map(r => (
-              <View key={r.id} style={styles.savedReportItem}>
-                <Text style={styles.savedReportName}>{r.name}</Text>
-                <Text style={styles.savedReportDate}>{r.createdAt}</Text>
-              </View>
+              <TouchableOpacity 
+                key={r.id} 
+                style={styles.savedReportItem}
+                onPress={() => handleShareReport(r)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.savedReportName}>{r.name}</Text>
+                  <Text style={styles.savedReportDate}>{r.createdAt}</Text>
+                </View>
+                <Text style={{ fontSize: 20 }}>📤</Text>
+              </TouchableOpacity>
             ))
           )}
         </View>

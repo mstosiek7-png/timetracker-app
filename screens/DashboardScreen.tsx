@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, StatusBar,
+  StyleSheet, StatusBar, Alert, Modal, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -14,20 +14,27 @@ import {
   Badge, Avatar, WorkerChip, GhostButton, Divider, BottomNav,
 } from '../components/ui';
 import { Colors, Spacing, FontFamily, FontSize, Shadows, Radius } from '../theme';
-import { useTimeEntries, useDeleteTimeEntry } from '../hooks/useTimeEntries';
+import { useTimeEntries, useDeleteTimeEntry, useUpdateTimeEntry } from '../hooks/useTimeEntries';
 import { useWorkers } from '../hooks/useWorkers';
+import { useDeleteEmployee } from '../hooks/useEmployees';
 import { AddEntryModal } from '../components/AddEntryModal';
 import { BulkEntryModal } from '../components/BulkEntryModal';
+import { EmployeeForm } from '../components/employee/EmployeeForm';
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 
 export default function DashboardScreen({ navigation }: Props) {
   const [showAddModal, setShowAddModal]   = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+  const [editingEntry, setEditingEntry]   = useState<{ id: string; hours: number } | null>(null);
+  const [editHours, setEditHours]         = useState('');
 
   const { data: allEntries = [], isLoading: loadingEntries } = useTimeEntries();
   const { workers } = useWorkers();
   const deleteEntry = useDeleteTimeEntry();
+  const updateEntry = useUpdateTimeEntry();
+  const deleteEmployee = useDeleteEmployee();
 
   const recentEntries = allEntries.slice(0, 10).map(e => ({
     id: e.id,
@@ -86,8 +93,12 @@ export default function DashboardScreen({ navigation }: Props) {
         <Card>
           <Text style={styles.cardTitle}>Szybkie akcje</Text>
           <View style={styles.actionsRow}>
-            <PrimaryButton label="+ Dodaj wpis" icon="✏️" onPress={() => setShowAddModal(true)} />
-            <SecondaryButton label="Zbiorczo" icon="📋" onPress={() => setShowBulkModal(true)} />
+            <View style={styles.actionButton}>
+              <PrimaryButton label="+ Dodaj wpis" icon="✏️" onPress={() => setShowAddModal(true)} style={{ width: '100%', justifyContent: 'center', minHeight: 52 }} />
+            </View>
+            <View style={styles.actionButton}>
+              <SecondaryButton label="Wszyscy" icon="📋" onPress={() => setShowBulkModal(true)} style={{ width: '100%', justifyContent: 'center', minHeight: 52 }} />
+            </View>
           </View>
         </Card>
 
@@ -102,7 +113,7 @@ export default function DashboardScreen({ navigation }: Props) {
             recentEntries.map((entry, i) => (
               <View key={entry.id}>
                 {i > 0 && <Divider style={{ marginVertical: 0 }} />}
-                <View style={styles.entryRow}>
+                <TouchableOpacity style={styles.entryRow} onPress={() => navigation.navigate('WorkerDetail', { workerId: entry.workerId })} activeOpacity={0.7}>
                   <View style={styles.entryLeft}>
                     <Avatar name={entry.workerName} size={36} />
                     <View>
@@ -112,14 +123,19 @@ export default function DashboardScreen({ navigation }: Props) {
                   </View>
                   <View style={styles.entryRight}>
                     <Badge label={entry.status} variant={entry.status.toLowerCase() as any} />
-                    <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('EditEntry', { entryId: entry.id })}>
+                    <TouchableOpacity style={styles.iconBtn} onPress={() => { setEditingEntry({ id: entry.id, hours: entry.hours }); setEditHours(entry.hours.toString()); }}>
                       <Text>✏️</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconBtn} onPress={() => {/* delete */}}>
+                    <TouchableOpacity style={styles.iconBtn} onPress={() => {
+                      Alert.alert('Usuń wpis', 'Czy na pewno usunąć ten wpis?', [
+                        { text: 'Anuluj', style: 'cancel' },
+                        { text: 'Usuń', style: 'destructive', onPress: () => { deleteEntry.mutate(entry.id); } },
+                      ]);
+                    }}>
                       <Text>🗑️</Text>
                     </TouchableOpacity>
                   </View>
-                </View>
+                </TouchableOpacity>
               </View>
             ))
           )}
@@ -147,12 +163,22 @@ export default function DashboardScreen({ navigation }: Props) {
                   <Text style={styles.manageName}>{w.firstName}</Text>
                   <Text style={styles.manageRole}>{w.lastName}</Text>
                 </View>
-                <Badge label={w.currentStatus ?? 'Praca'} variant={(w.currentStatus?.toLowerCase() ?? 'praca') as any} />
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <Badge label={w.currentStatus ?? 'Praca'} variant={(w.currentStatus?.toLowerCase() ?? 'praca') as any} />
+                  <TouchableOpacity style={styles.deleteWorkerBtn} onPress={() => {
+                    Alert.alert('Usuń pracownika', `Czy na pewno usunąć pracownika ${w.firstName}?`, [
+                      { text: 'Anuluj', style: 'cancel' },
+                      { text: 'Usuń', style: 'destructive', onPress: () => { deleteEmployee.mutate(w.id); } },
+                    ]);
+                  }}>
+                    <Text>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           ))}
           <View style={{ marginTop: Spacing.md }}>
-            <TouchableOpacity style={styles.addWorkerBtn} onPress={() => navigation.navigate('AddWorker')}>
+            <TouchableOpacity style={styles.addWorkerBtn} onPress={() => setShowEmployeeForm(true)}>
               <Text style={styles.addWorkerText}>+ Dodaj pracownika</Text>
             </TouchableOpacity>
           </View>
@@ -166,6 +192,40 @@ export default function DashboardScreen({ navigation }: Props) {
       {/* Modals */}
       <AddEntryModal visible={showAddModal} onClose={() => setShowAddModal(false)} />
       <BulkEntryModal visible={showBulkModal} onClose={() => setShowBulkModal(false)} />
+      <EmployeeForm visible={showEmployeeForm} onClose={() => setShowEmployeeForm(false)} mode="create" />
+
+      {/* Edit Hours Modal */}
+      <Modal visible={!!editingEntry} transparent animationType="fade" onRequestClose={() => setEditingEntry(null)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setEditingEntry(null)} />
+        <View style={styles.editModal}>
+          <Text style={styles.editModalTitle}>Edytuj godziny</Text>
+          <TextInput
+            style={styles.editModalInput}
+            value={editHours}
+            onChangeText={setEditHours}
+            keyboardType="decimal-pad"
+            placeholder="np. 8.5"
+            placeholderTextColor={Colors.grayLight}
+          />
+          <View style={styles.editModalBtns}>
+            <TouchableOpacity style={[styles.editModalBtn, styles.editModalBtnCancel]} onPress={() => setEditingEntry(null)}>
+              <Text style={styles.editModalBtnCancelText}>Anuluj</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editModalBtn, styles.editModalBtnSave]}
+              disabled={!editHours.trim()}
+              onPress={() => {
+                if (editingEntry && editHours.trim()) {
+                  updateEntry.mutate({ id: editingEntry.id, hours: parseFloat(editHours) });
+                  setEditingEntry(null);
+                }
+              }}
+            >
+              <Text style={styles.editModalBtnSaveText}>Zapisz</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -195,6 +255,7 @@ const styles = StyleSheet.create({
 
   cardTitle: { fontSize: FontSize.xs, fontFamily: FontFamily.semiBold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.md },
   actionsRow: { flexDirection: 'row', gap: 10 },
+  actionButton: { flex: 1 },
 
   entryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.md },
   entryLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -214,10 +275,33 @@ const styles = StyleSheet.create({
   manageRole: { fontSize: FontSize.sm, fontFamily: FontFamily.regular, color: Colors.grayMid, marginTop: 2 },
 
   addWorkerBtn: {
-    borderWidth: 1.5, borderColor: Colors.orange, borderRadius: Radius.pill,
+    backgroundColor: Colors.orange, borderRadius: Radius.pill,
     paddingVertical: 12, alignItems: 'center',
   },
-  addWorkerText: { color: Colors.orange, fontFamily: FontFamily.semiBold, fontSize: FontSize.md },
+  addWorkerText: { color: '#fff', fontFamily: FontFamily.semiBold, fontSize: FontSize.md },
+  deleteWorkerBtn: { padding: 6 },
 
   emptyText: { fontSize: FontSize.base, color: Colors.grayMid, fontStyle: 'italic', textAlign: 'center', paddingVertical: Spacing.lg },
+
+  // Edit Hours Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  editModal: {
+    position: 'absolute', top: '50%', left: '50%', transform: [{ translateX: -150 }, { translateY: -100 }],
+    width: 300, backgroundColor: Colors.white, borderRadius: Radius.md,
+    padding: Spacing.lg, ...Shadows.md,
+  },
+  editModalTitle: { fontSize: FontSize.lg, fontFamily: FontFamily.semiBold, color: Colors.black, marginBottom: Spacing.md },
+  editModalInput: {
+    backgroundColor: Colors.cream, borderRadius: Radius.sm,
+    borderWidth: 1.5, borderColor: Colors.creamDark,
+    paddingVertical: 12, paddingHorizontal: 14,
+    fontSize: FontSize.md, fontFamily: FontFamily.medium, color: Colors.black,
+    marginBottom: Spacing.md,
+  },
+  editModalBtns: { flexDirection: 'row', gap: 10 },
+  editModalBtn: { flex: 1, paddingVertical: 12, borderRadius: Radius.sm, alignItems: 'center' },
+  editModalBtnCancel: { backgroundColor: Colors.creamDark },
+  editModalBtnCancelText: { color: Colors.black, fontFamily: FontFamily.semiBold, fontSize: FontSize.md },
+  editModalBtnSave: { backgroundColor: Colors.orange },
+  editModalBtnSaveText: { color: '#fff', fontFamily: FontFamily.semiBold, fontSize: FontSize.md },
 });

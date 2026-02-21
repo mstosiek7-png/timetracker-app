@@ -285,16 +285,16 @@ const styles = StyleSheet.create({
   // Buttons
   btnPrimary: {
     backgroundColor: Colors.orange, borderRadius: Radius.pill,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   btnSecondary: {
     backgroundColor: Colors.black, borderRadius: Radius.pill,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   btnOutline: {
     backgroundColor: 'transparent', borderRadius: Radius.pill,
     borderWidth: 1.5, borderColor: Colors.orange,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   btnSm:  { paddingVertical: 9,  paddingHorizontal: 14 },
   btnMd:  { paddingVertical: 13, paddingHorizontal: 20 },

@@ -20,6 +20,7 @@ type Props = {
 };
 
 export default function SiteDetailScreen({ navigation, route }: Props) {
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const siteId = route.params?.siteId;
   const { getSite, deleteSite } = useBaustellen();
   const site = getSite(siteId);
@@ -29,13 +30,28 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
   const handleDelete = () => {
     Alert.alert('Usuń budowę', `Czy na pewno chcesz usunąć "${site.name}"?`, [
       { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: () => { deleteSite(siteId); navigation.goBack(); } },
+      { text: 'Usuń', style: 'destructive', onPress: async () => { 
+        setIsDeleting(true);
+        try {
+          await deleteSite(siteId); 
+          setIsDeleting(false);
+          navigation.goBack(); 
+        } catch (err) {
+          setIsDeleting(false);
+          const message = err instanceof Error ? err.message : 'Nieznany błąd';
+          Alert.alert('Błąd usuwania', message);
+        }
+      } },
     ]);
   };
 
   const HeaderRight = (
-    <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-      <Text style={styles.deleteBtnText}>🗑 Usuń</Text>
+    <TouchableOpacity 
+      style={[styles.deleteBtn, isDeleting && styles.deleteBtnDisabled]} 
+      onPress={handleDelete}
+      disabled={isDeleting}
+    >
+      <Text style={styles.deleteBtnText}>{isDeleting ? '⏳' : '🗑'} Usuń</Text>
     </TouchableOpacity>
   );
 
@@ -127,6 +143,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.red, borderRadius: Radius.pill,
     paddingVertical: 7, paddingHorizontal: 14,
     flexDirection: 'row', alignItems: 'center', gap: 4,
+  },
+  deleteBtnDisabled: {
+    backgroundColor: Colors.grayMid,
+    opacity: 0.6,
   },
   deleteBtnText: { color: '#fff', fontFamily: FontFamily.semiBold, fontSize: FontSize.base },
   summaryTable: {

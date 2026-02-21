@@ -280,15 +280,25 @@ function translateStatus(status: string): string {
  * Udostępnia plik użytkownikowi (do pobrania/wysłania)
  */
 export async function shareReport(fileUri: string): Promise<void> {
+  console.log('shareReport called with:', fileUri);
+  
+  // Check if file exists
+  const fileInfo = await FileSystem.getInfoAsync(fileUri);
+  if (!fileInfo.exists) {
+    throw new Error('Plik raportu nie został znaleziony');
+  }
+  
   if (!(await Sharing.isAvailableAsync())) {
     throw new Error('Udostępnianie nie jest dostępne na tym urządzeniu');
   }
   
-  await Sharing.shareAsync(fileUri, {
+  console.log('Opening share dialog...');
+  const result = await Sharing.shareAsync(fileUri, {
     mimeType: fileUri.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     dialogTitle: 'Udostępnij raport',
     UTI: fileUri.endsWith('.pdf') ? 'com.adobe.pdf' : 'org.openxmlformats.spreadsheetml.sheet'
   });
+  console.log('Share result:', result);
 }
 
 /**

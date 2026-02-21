@@ -11,11 +11,12 @@ import {
   StyleSheet,
   Alert,
   Modal,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useCreateEmployee, useUpdateEmployee } from '../../hooks/useEmployees';
+import { OutlineButton, PrimaryButton, Checkbox } from '../ui';
+import { Colors, Spacing, FontFamily, FontSize, Radius } from '../../theme';
 import { EmployeeInsert, EmployeeUpdate } from '../../types/models';
 
 interface EmployeeFormProps {
@@ -111,252 +112,122 @@ export function EmployeeForm({
   const handleInputChange = (field: keyof typeof formData, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: '' }));
     }
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={handleClose}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-      >
-        <View style={styles.overlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.header}>
-              <Text style={styles.title}>
-                {mode === 'create' ? 'Dodaj pracownika' : 'Edytuj pracownika'}
-              </Text>
-              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>×</Text>
-              </TouchableOpacity>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+      <View style={styles.overlay}>
+        <TouchableOpacity style={styles.backdrop} onPress={handleClose} activeOpacity={1} />
+        <View style={styles.sheet}>
+          {/* ─── Colored header ────────────────────── */}
+          <View style={styles.colorHeader}>
+            <View style={styles.handle} />
+            <Text style={styles.headerTitle}>{mode === 'create' ? 'Dodaj pracownika' : 'Edytuj pracownika'}</Text>
+          </View>
+
+          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+            {/* ─── Name ──────────────────────────────── */}
+            <View style={styles.section}>
+              <Text style={styles.label}>Imię i nazwisko</Text>
+              <TextInput
+                style={[styles.input, errors.name && styles.inputError]}
+                value={formData.name}
+                onChangeText={(value) => handleInputChange('name', value)}
+                placeholder="Np. Jan Kowalski"
+                maxLength={255}
+                autoCapitalize="words"
+                placeholderTextColor={Colors.grayLight}
+              />
+              {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
             </View>
 
-            <ScrollView style={styles.form}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Imię i nazwisko *</Text>
-                <TextInput
-                  style={[styles.input, errors.name && styles.inputError]}
-                  value={formData.name}
-                  onChangeText={(value) => handleInputChange('name', value)}
-                  placeholder="Np. Jan Kowalski"
-                  maxLength={255}
-                  autoCapitalize="words"
-                />
-                {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Stanowisko *</Text>
-                <TextInput
-                  style={[styles.input, errors.position && styles.inputError]}
-                  value={formData.position}
-                  onChangeText={(value) => handleInputChange('position', value)}
-                  placeholder="Np. Kierownik budowy"
-                  maxLength={100}
-                  autoCapitalize="words"
-                />
-                {errors.position && (
-                  <Text style={styles.errorText}>{errors.position}</Text>
-                )}
-              </View>
-
-              <View style={styles.inputGroup}>
-                <View style={styles.checkboxContainer}>
-                  <TouchableOpacity
-                    style={[styles.checkbox, formData.active && styles.checkboxChecked]}
-                    onPress={() => handleInputChange('active', !formData.active)}
-                  >
-                    {formData.active && <Text style={styles.checkmark}>✓</Text>}
-                  </TouchableOpacity>
-                  <Text style={styles.checkboxLabel}>Aktywny</Text>
-                </View>
-                <Text style={styles.helperText}>
-                  Nieaktywni pracownicy nie będą wyświetlani na liście przy dodawaniu godzin
-                </Text>
-              </View>
-            </ScrollView>
-
-            <View style={styles.footer}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={handleClose}
-                disabled={isLoading}
-              >
-                <Text style={styles.cancelButtonText}>Anuluj</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, styles.submitButton, isLoading && styles.buttonDisabled]}
-                onPress={handleSubmit}
-                disabled={isLoading}
-              >
-                <Text style={styles.submitButtonText}>
-                  {isLoading
-                    ? 'Przetwarzanie...'
-                    : mode === 'create'
-                    ? 'Dodaj pracownika'
-                    : 'Zapisz zmiany'}
-                </Text>
-              </TouchableOpacity>
+            {/* ─── Position ──────────────────────────– */}
+            <View style={styles.section}>
+              <Text style={styles.label}>Stanowisko</Text>
+              <TextInput
+                style={[styles.input, errors.position && styles.inputError]}
+                value={formData.position}
+                onChangeText={(value) => handleInputChange('position', value)}
+                placeholder="Np. Kierownik budowy"
+                maxLength={100}
+                autoCapitalize="words"
+                placeholderTextColor={Colors.grayLight}
+              />
+              {errors.position && <Text style={styles.errorText}>{errors.position}</Text>}
             </View>
+
+            {/* ─── Active checkbox ───────────────────── */}
+            <View style={styles.section}>
+              <View style={styles.checkboxRow}>
+                <Checkbox checked={formData.active} onToggle={() => handleInputChange('active', !formData.active)} />
+                <Text style={styles.checkboxLabel}>Aktywny pracownik</Text>
+              </View>
+              <Text style={styles.helperText}>Nieaktywni pracownicy nie będą wyświetlani przy dodawaniu godzin</Text>
+            </View>
+
+            <View style={{ height: Spacing.xxxl }} />
+          </ScrollView>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <OutlineButton label="Anuluj" onPress={handleClose} style={{ flex: 1, minHeight: 52 }} />
+            <PrimaryButton
+              label={mode === 'create' ? 'Dodaj pracownika' : 'Zapisz'}
+              onPress={handleSubmit}
+              loading={isLoading}
+              style={{ flex: 1, minHeight: 52 }}
+            />
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: '95%',
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    padding: 20,
+  colorHeader: {
+    backgroundColor: Colors.orange,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: Spacing.xl,
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    maxHeight: '80%',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    alignSelf: 'center', marginBottom: 12,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: 24,
-    color: '#6b7280',
-    lineHeight: 24,
-  },
-  form: {
-    padding: 20,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 6,
-  },
+  headerTitle: { fontSize: FontSize.h3, fontFamily: FontFamily.bold, color: '#fff' },
+  body: { paddingHorizontal: Spacing.xl },
+  section: { marginTop: Spacing.xl },
+  label: { fontSize: FontSize.xs, fontFamily: FontFamily.semiBold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.sm },
   input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.cream, borderRadius: Radius.sm,
+    borderWidth: 1.5, borderColor: Colors.creamDark,
+    fontFamily: FontFamily.regular, fontSize: FontSize.md,
+    paddingVertical: 12, paddingHorizontal: 14,
+    color: Colors.black,
   },
-  inputError: {
-    borderColor: '#ef4444',
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#ef4444',
-    marginTop: 4,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
-  },
-  checkmark: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  checkboxLabel: {
-    fontSize: 16,
-    color: '#374151',
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-  },
+  inputError: { borderColor: '#ef4444' },
+  errorText: { fontSize: FontSize.xs, color: '#ef4444', marginTop: Spacing.sm },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.sm },
+  checkboxLabel: { fontSize: FontSize.md, fontFamily: FontFamily.semiBold, color: Colors.black },
+  helperText: { fontSize: FontSize.xs, color: Colors.grayMid, fontStyle: 'italic', marginTop: Spacing.xs },
   footer: {
-    flexDirection: 'row',
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    gap: 12,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  cancelButtonText: {
-    color: '#374151',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  submitButton: {
-    backgroundColor: '#3b82f6',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    flexDirection: 'row', gap: 10,
+    paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg,
+    borderTopWidth: 1, borderTopColor: Colors.creamDark,
+    justifyContent: 'center', alignItems: 'center',
   },
 });
 
-export default EmployeeForm;
+export { EmployeeForm };

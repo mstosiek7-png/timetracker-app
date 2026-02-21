@@ -31,6 +31,7 @@ export default function BaustellenScreen({ navigation }: Props) {
         <Text style={styles.totalLabel}>Łącznie ton</Text>
       </View>
 
+      <View style={styles.content}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={{ height: Spacing.lg }} />
         {sites.map(site => (
@@ -65,10 +66,13 @@ export default function BaustellenScreen({ navigation }: Props) {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={() => setShowNewSite(true)} activeOpacity={0.9}>
-        <Text style={styles.fabIcon}>+</Text>
-      </TouchableOpacity>
+      {/* FAB — positioned inside content area, always above BottomNav */}
+      <View style={styles.fabContainer} pointerEvents="box-none">
+        <TouchableOpacity style={styles.fab} onPress={() => setShowNewSite(true)} activeOpacity={0.9}>
+          <Text style={styles.fabIcon}>+</Text>
+        </TouchableOpacity>
+      </View>
+      </View>
 
       <BottomNav active="Baustellen" onNavigate={(s) => navigation.navigate(s)} />
 
@@ -79,6 +83,7 @@ export default function BaustellenScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.cream },
+  content: { flex: 1 },
   scroll: { flex: 1 },
   totalBar: {
     backgroundColor: Colors.white,
@@ -106,11 +111,15 @@ const styles = StyleSheet.create({
   siteChipText: { fontSize: FontSize.sm, fontFamily: FontFamily.semiBold, color: Colors.grayDark },
   chevron: { fontSize: 22, color: Colors.grayLight, marginLeft: 8 },
   fab: {
-    position: 'absolute', bottom: 80, alignSelf: 'center',
     width: 56, height: 56, borderRadius: 28,
     backgroundColor: Colors.orange,
     alignItems: 'center', justifyContent: 'center',
     ...Shadows.orange,
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 16,
+    alignSelf: 'center',
   },
   fabIcon: { color: '#fff', fontSize: 28, lineHeight: 32 },
 });
