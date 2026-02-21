@@ -109,12 +109,13 @@ async function createTimeEntry(timeEntryData: TimeEntryInsert) {
 }
 
 /**
- * Tworzy wiele wpisów czasu pracy naraz (bulk insert)
+ * Tworzy wiele wpisów czasu pracy naraz (bulk upsert)
+ * Jeśli wpis dla danego pracownika i daty już istnieje, zostaje zaktualizowany
  */
 async function createBulkTimeEntries(timeEntriesData: TimeEntryInsert[]) {
   const { data, error } = await supabase
     .from('time_entries')
-    .insert(timeEntriesData)
+    .upsert(timeEntriesData, { onConflict: 'employee_id,date' })
     .select('*, employees(*)');
 
   if (error) {

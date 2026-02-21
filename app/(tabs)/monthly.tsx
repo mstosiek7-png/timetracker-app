@@ -385,20 +385,26 @@ export default function MonthlyViewScreen() {
                                 {day.totalHours}h
                               </Text>
                               {day.entries.length > 0 && (
-                                <View style={styles.statusIndicators}>
-                                  {day.entries.map((entry, idx) => (
-                                    <View
-                                      key={idx}
-                                      style={[
-                                        styles.statusDot,
-                                        {
-                                          backgroundColor:
-                                            theme.colors.statusColors[entry.status as StatusType]
-                                              ?.text ?? theme.colors.muted,
-                                        },
-                                      ]}
-                                    />
-                                  ))}
+                                <View style={styles.statusLabels}>
+                                  {day.entries.map((entry, idx) => {
+                                    const color =
+                                      theme.colors.statusColors[entry.status as StatusType]
+                                        ?.text ?? theme.colors.muted;
+                                    const bg =
+                                      theme.colors.statusColors[entry.status as StatusType]
+                                        ?.bg ?? theme.colors.background;
+                                    const abbrev = getStatusAbbrev(entry.status);
+                                    return (
+                                      <View
+                                        key={idx}
+                                        style={[styles.statusLabel, { backgroundColor: bg, borderColor: color }]}
+                                      >
+                                        <Text style={[styles.statusLabelText, { color }]}>
+                                          {abbrev}
+                                        </Text>
+                                      </View>
+                                    );
+                                  })}
                                 </View>
                               )}
                             </View>
@@ -508,6 +514,21 @@ export default function MonthlyViewScreen() {
       </Modal>
     </SafeAreaView>
   );
+}
+
+// =====================================================
+// Helper Functions
+// =====================================================
+
+const STATUS_ABBREV: Record<string, string> = {
+  work: 'P',
+  sick: 'CH',
+  vacation: 'U',
+  fza: 'FZA',
+};
+
+function getStatusAbbrev(status: string): string {
+  return STATUS_ABBREV[status] ?? status.toUpperCase().substring(0, 3);
 }
 
 // =====================================================
@@ -674,9 +695,9 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: 40,
-    height: 60,
-    margin: 4,
-    padding: 4,
+    height: 68,
+    margin: 3,
+    padding: 3,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.card,
     borderWidth: 1,
@@ -711,12 +732,32 @@ const styles = StyleSheet.create({
   statusIndicators: {
     flexDirection: 'row',
     marginTop: 2,
+    flexWrap: 'wrap',
+    gap: 1,
   },
   statusDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
     marginHorizontal: 1,
+  },
+  statusLabels: {
+    flexDirection: 'row',
+    marginTop: 2,
+    flexWrap: 'wrap',
+    gap: 1,
+    justifyContent: 'center',
+  },
+  statusLabel: {
+    borderWidth: 1,
+    borderRadius: 3,
+    paddingHorizontal: 2,
+    paddingVertical: 0,
+  },
+  statusLabelText: {
+    fontSize: 7,
+    fontWeight: '700',
+    lineHeight: 10,
   },
 
   // ── Detailed List ──

@@ -13,7 +13,6 @@ import {
   Modal,
   Portal,
   Button,
-  TextInput,
   Text,
   Divider,
   Chip,
@@ -45,7 +44,8 @@ interface EmployeeEntry {
   id: string;
   name: string;
   position: string;
-  hours: string;
+  startTime: Date;
+  endTime: Date;
   status: TimeEntryStatus;
   selected: boolean;
 }
@@ -62,7 +62,14 @@ export default function BulkTimeEntryModal({
   // State
   const [date, setDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [defaultHours, setDefaultHours] = useState<string>('8');
+  const [defaultStartTime, setDefaultStartTime] = useState<Date>(() => {
+    const t = new Date(); t.setHours(7, 0, 0, 0); return t;
+  });
+  const [defaultEndTime, setDefaultEndTime] = useState<Date>(() => {
+    const t = new Date(); t.setHours(15, 0, 0, 0); return t;
+  });
+  const [showDefaultStartPicker, setShowDefaultStartPicker] = useState(false);
+  const [showDefaultEndPicker, setShowDefaultEndPicker] = useState(false);
   const [defaultStatus, setDefaultStatus] = useState<TimeEntryStatus>('work');
   const [employeeEntries, setEmployeeEntries] = useState<EmployeeEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -83,13 +90,14 @@ export default function BulkTimeEntryModal({
           id: employee.id,
           name: employee.name,
           position: employee.position,
-          hours: defaultHours,
+          startTime: defaultStartTime,
+          endTime: defaultEndTime,
           status: defaultStatus,
           selected: true,
         }));
       setEmployeeEntries(initialEntries);
     }
-  }, [employees, defaultHours, defaultStatus]);
+  }, [employees, defaultStartTime, defaultEndTime, defaultStatus]);
 
   // =====================================================
   // Handlers
@@ -100,6 +108,26 @@ export default function BulkTimeEntryModal({
     if (selectedDate) {
       setDate(selectedDate);
     }
+  };
+
+  const handleDefaultStartTimeChange = (event: any, selectedTime?: Date) => {
+    setShowDefaultStartPicker(false);
+    if (selectedTime) {
+      setDefaultStartTime(selectedTime);
+    }
+  };
+
+  const handleDefaultEndTimeChange = (event: any, selectedTime?: Date) => {
+    setShowDefaultEndPicker(false);
+    if (selectedTime) {
+      setDefaultEndTime(selectedTime);
+    }
+  };
+
+  const calculateHours = (startTime: Date, endTime: Date): number => {
+    const diffMs = endTime.getTime() - startTime.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    return Math.round(Math.max(diffHours, 0) * 10) / 10;
   };
 
   const updateEmployeeEntry = (
@@ -123,20 +151,20 @@ export default function BulkTimeEntryModal({
     setEmployeeEntries(prev =>
       prev.map(entry => ({
         ...entry,
-        hours: defaultHours,
+        startTime: defaultStartTime,
+        endTime: defaultEndTime,
         status: defaultStatus,
       }))
     );
   };
 
   const validateEntries = (): boolean => {
-    const hasInvalidHours = employeeEntries.some(entry => {
-      const hoursNum = parseFloat(entry.hours);
-      return entry.selected && (isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 24);
-    });
+    const hasInvalidTimes = employeeEntries.some(entry =>
+      entry.selected && entry.startTime >= entry.endTime
+    );
 
-    if (hasInvalidHours) {
-      Alert.alert('Błąd', 'Wprowadź poprawne wartości godzin (0-24) dla wybranych pracowników');
+    if (hasInvalidTimes) {
+      Alert.alert('Błąd', 'Godzina końcowa musi być późniejsza niż godzina początkowa');
       return false;
     }
 
@@ -161,7 +189,7 @@ export default function BulkTimeEntryModal({
       const timeEntriesData: TimeEntryInsert[] = selectedEntries.map(entry => ({
         employee_id: entry.id,
         date: format(date, 'yyyy-MM-dd'),
-        hours: parseFloat(entry.hours),
+        hours: calculateHours(entry.startTime, entry.endTime),
         status: entry.status,
         notes: null,
       }));
@@ -194,10 +222,7 @@ export default function BulkTimeEntryModal({
   // Render
 // =====================================================
 
-  const isValidHours = (hoursStr: string) => {
-    const hoursNum = parseFloat(hoursStr);
-    return !isNaN(hoursNum) && hoursNum > 0 && hoursNum <= 24;
-  };
+  const isTimeRangeValid = (startTime: Date, endTime: Date) => startTime < endTime;
 
   const selectedCount = employeeEntries.filter(entry => entry.selected).length;
   const isLoading = isLoadingEmployees || isPending || isSaving;
@@ -227,19 +252,62 @@ export default function BulkTimeEntryModal({
               
               <View style={styles.defaultSettings}>
                 <View style={styles.defaultInput}>
-                  <Text style={styles.label}>Domyślne godziny</Text>
-                  <TextInput
-                    value={defaultHours}
-                    onChangeText={setDefaultHours}
-                    placeholder="8"
-                    keyboardType="numeric"
-                    mode="outlined"
-                    style={styles.smallInput}
-                    error={!isValidHours(defaultHours)}
-                  />
-                  <HelperText type="error" visible={!isValidHours(defaultHours)}>
-                    Nieprawidłowe godziny
-                  </HelperText>
+                  <Text style={styles.label}>Godziny pracy (domyślne)</Text>
+                  <View style={styles.timeRangeRow}>
+                    <View style={styles.timePickerWrapper}>
+                      <Text style={styles.timeLabel}>Od</Text>
+                      <Button
+                        mode="outlined"
+                        onPress={() => setShowDefaultStartPicker(true)}
+                        style={styles.timeButton}
+                        icon="clock-in"
+                        disabled={isLoading}
+                        compact
+                      >
+                        {format(defaultStartTime, 'HH:mm')}
+                      </Button>
+                      {showDefaultStartPicker && (
+                        <DateTimePicker
+                          value={defaultStartTime}
+                          mode="time"
+                          display="spinner"
+                          onChange={handleDefaultStartTimeChange}
+                        />
+                      )}
+                    </View>
+                    <View style={styles.timePickerWrapper}>
+                      <Text style={styles.timeLabel}>Do</Text>
+                      <Button
+                        mode="outlined"
+                        onPress={() => setShowDefaultEndPicker(true)}
+                        style={styles.timeButton}
+                        icon="clock-out"
+                        disabled={isLoading}
+                        compact
+                      >
+                        {format(defaultEndTime, 'HH:mm')}
+                      </Button>
+                      {showDefaultEndPicker && (
+                        <DateTimePicker
+                          value={defaultEndTime}
+                          mode="time"
+                          display="spinner"
+                          onChange={handleDefaultEndTimeChange}
+                        />
+                      )}
+                    </View>
+                    <View style={styles.timeResultWrapper}>
+                      <Text style={styles.timeLabel}>Razem</Text>
+                      <Text style={styles.hoursResult}>
+                        {calculateHours(defaultStartTime, defaultEndTime).toFixed(1)}h
+                      </Text>
+                    </View>
+                  </View>
+                  {defaultStartTime >= defaultEndTime && (
+                    <HelperText type="error" visible>
+                      Godzina końcowa musi być późniejsza niż początkowa
+                    </HelperText>
+                  )}
                 </View>
 
                 <View style={styles.defaultInput}>
@@ -333,7 +401,7 @@ export default function BulkTimeEntryModal({
                   <DataTable.Header>
                     <DataTable.Title>Wybór</DataTable.Title>
                     <DataTable.Title>Pracownik</DataTable.Title>
-                    <DataTable.Title numeric>Godziny</DataTable.Title>
+                    <DataTable.Title numeric>Godz.</DataTable.Title>
                     <DataTable.Title>Status</DataTable.Title>
                   </DataTable.Header>
 
@@ -353,18 +421,16 @@ export default function BulkTimeEntryModal({
                         <Text style={styles.employeePosition}>{entry.position}</Text>
                       </DataTable.Cell>
                       <DataTable.Cell numeric>
-                        <TextInput
-                          value={entry.hours}
-                          onChangeText={hours =>
-                            updateEmployeeEntry(entry.id, { hours })
-                          }
-                          keyboardType="numeric"
-                          mode="outlined"
-                          style={styles.hoursInput}
-                          dense
-                          disabled={isLoading || !entry.selected}
-                          error={!isValidHours(entry.hours) && entry.selected}
-                        />
+                        <Text
+                          style={[
+                            styles.hoursText,
+                            (!isTimeRangeValid(entry.startTime, entry.endTime) && entry.selected)
+                              ? styles.hoursTextError
+                              : null,
+                          ]}
+                        >
+                          {calculateHours(entry.startTime, entry.endTime).toFixed(1)}h
+                        </Text>
                       </DataTable.Cell>
                       <DataTable.Cell>
                         <View style={styles.statusSelect}>
@@ -481,8 +547,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   defaultSettings: {
-    flexDirection: 'row',
-    gap: 20,
+    flexDirection: 'column',
+    gap: 16,
     marginBottom: 16,
   },
   defaultInput: {
@@ -492,6 +558,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 8,
+  },
+  timeRangeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  timePickerWrapper: {
+    flex: 1,
+  },
+  timeButton: {
+    alignSelf: 'stretch',
+  },
+  timeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
+  },
+  timeResultWrapper: {
+    flex: 0.6,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 8,
+  },
+  hoursResult: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1976D2',
+  },
+  hoursText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1976D2',
+  },
+  hoursTextError: {
+    color: '#B00020',
   },
   smallInput: {
     backgroundColor: 'white',
@@ -529,7 +631,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   hoursInput: {
-    width: 80,
+    width: 60,
     backgroundColor: 'white',
   },
   statusSelect: {
