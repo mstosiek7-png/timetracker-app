@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme, StatusType } from '../../constants/theme';
+import { useI18n } from '../../i18n/I18nProvider';
 
 interface StatusBadgeProps {
   status: StatusType;
@@ -8,16 +9,17 @@ interface StatusBadgeProps {
   size?: 'sm' | 'md';
 }
 
-const STATUS_LABELS: Record<StatusType, string> = {
-  work: 'Praca',
-  sick: 'Choroba',
-  vacation: 'Urlop',
-  fza: 'FZA',
-};
-
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, size = 'md' }) => {
+  const { t } = useI18n();
   const statusColor = theme.colors.statusColors[status];
   const isSm = size === 'sm';
+
+  const defaultLabelMap: Record<StatusType, string> = {
+    work: t('Praca'),
+    sick: t('Chorobowe'),
+    vacation: t('Urlop'),
+    fza: t('FZA'),
+  };
 
   return (
     <View
@@ -39,7 +41,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, size = 
           },
         ]}
       >
-        {label ?? STATUS_LABELS[status]}
+        {label ?? defaultLabelMap[status]}
       </Text>
     </View>
   );

@@ -10,10 +10,12 @@ import { AppHeader, BottomNav } from '../components/ui';
 import NewConstructionModal from '../components/NewConstructionModal';
 import WeeklyView from '../components/baustellen/WeeklyView';
 import { Colors } from '../theme';
+import { useI18n } from '../i18n/I18nProvider';
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 
 export default function BaustellenScreen({ navigation }: Props) {
+  const { t } = useI18n();
   const [showNewSite, setShowNewSite] = useState(false);
   const [selectedDayKey, setSelectedDayKey] = useState(() => {
     const now = new Date();
@@ -26,7 +28,7 @@ export default function BaustellenScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.orange} />
-      <AppHeader title="Lista Budów" />
+      <AppHeader title={t('Lista budow')} />
 
       <WeeklyView
         onOpenSite={(siteId, dayKey) => navigation.navigate('SiteDetail', { siteId, day: dayKey })}

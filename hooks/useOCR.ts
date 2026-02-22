@@ -13,6 +13,7 @@ import {
   OCRResult,
 } from '../services/ocr';
 import { Document } from '../types/models';
+import { useI18n } from '../i18n/I18nProvider';
 
 // =====================================================
 // Query Keys
@@ -65,6 +66,7 @@ async function removeDocument(documentId: string): Promise<void> {
  * Hook do skanowania dokumentów
  */
 export function useScanDocument() {
+  const { t } = useI18n();
   return useMutation({
     mutationFn: scanDocumentWithOptions,
     onSuccess: (data) => {
@@ -72,7 +74,7 @@ export function useScanDocument() {
     },
     onError: (error: Error) => {
       console.error('Błąd skanowania dokumentu:', error);
-      Alert.alert('Błąd', `Nie udało się zeskanować dokumentu: ${error.message}`);
+      Alert.alert(t('Blad'), t('Nie udalo sie zeskanowac dokumentu'));
     },
   });
 }
@@ -81,6 +83,7 @@ export function useScanDocument() {
  * Hook do przetwarzania istniejącego obrazu
  */
 export function useProcessImage() {
+  const { t } = useI18n();
   return useMutation({
     mutationFn: processImageWithUri,
     onSuccess: (data) => {
@@ -88,7 +91,7 @@ export function useProcessImage() {
     },
     onError: (error: Error) => {
       console.error('Błąd przetwarzania obrazu:', error);
-      Alert.alert('Błąd', `Nie udało się przetworzyć obrazu: ${error.message}`);
+      Alert.alert(t('Blad'), t('Nie udalo sie przetworzyc obrazu'));
     },
   });
 }
@@ -109,6 +112,7 @@ export function useDocumentHistory() {
  * Hook do usuwania dokumentów
  */
 export function useDeleteDocument() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -120,7 +124,7 @@ export function useDeleteDocument() {
     },
     onError: (error: Error) => {
       console.error('Błąd usuwania dokumentu:', error);
-      Alert.alert('Błąd', `Nie udało się usunąć dokumentu: ${error.message}`);
+      Alert.alert(t('Blad'), t('Nie udalo sie usunac dokumentu'));
     },
   });
 }

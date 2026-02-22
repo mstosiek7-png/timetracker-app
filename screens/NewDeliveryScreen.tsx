@@ -17,6 +17,7 @@ import { AppHeader, PrimaryButton, BottomNav } from '../components/ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius } from '../theme';
 import { useBaustellen } from '../hooks/useBaustellen';
 import * as ImagePicker from 'expo-image-picker';
+import { useI18n } from '../i18n/I18nProvider';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -29,6 +30,7 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
   const siteId = route.params?.siteId;
   const { addDelivery, getSite } = useBaustellen();
   const site = getSite(siteId);
+  const { t, language } = useI18n();
 
   const [asphaltClass, setAsphaltClass] = useState('');
   const [weight, setWeight] = useState('');
@@ -55,14 +57,14 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
     try {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (perm.status !== 'granted') {
-        Alert.alert('Brak uprawnień', 'Wymagany dostęp do kamery.');
+        Alert.alert(t('Brak uprawnien'), t('Wymagany dostep do kamery.'));
         return;
       }
       const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.8 });
       if (!result.canceled && result.assets?.[0]?.uri) setPhotoUri(result.assets[0].uri);
     } catch (err) {
       console.error('Camera error:', err);
-      Alert.alert('Błąd', 'Nie udało się otworzyć aparatu.');
+      Alert.alert(t('Blad'), t('Nie udalo sie otworzyc aparatu.'));
     }
   }
 
@@ -70,14 +72,14 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (perm.status !== 'granted') {
-        Alert.alert('Brak uprawnień', 'Wymagany dostęp do galerii.');
+        Alert.alert(t('Brak uprawnien'), t('Wymagany dostep do galerii.'));
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.8 });
       if (!result.canceled && result.assets?.[0]?.uri) setPhotoUri(result.assets[0].uri);
     } catch (err) {
       console.error('Gallery error:', err);
-      Alert.alert('Błąd', 'Nie udało się otworzyć galerii.');
+      Alert.alert(t('Blad'), t('Nie udalo sie otworzyc galerii.'));
     }
   }
 
@@ -85,7 +87,7 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
     try {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (perm.status !== 'granted') {
-        Alert.alert('Brak uprawnień', 'Wymagany dostęp do kamery.');
+        Alert.alert(t('Brak uprawnien'), t('Wymagany dostep do kamery.'));
         return;
       }
 
@@ -112,7 +114,7 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
               messages: [{
                 role: 'user',
                 content: [
-                  { type: 'text', text: 'Odczytaj numer listu przewozowego / Lieferschein z tego dokumentu. Zwróć TYLKO sam numer, nic więcej. Jeśli nie możesz go znaleźć, zwróć pusty ciąg znaków.' },
+                  { type: 'text', text: t('OCR prompt') },
                   { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${asset.base64}` } },
                 ],
               }],
@@ -124,7 +126,7 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
           if (extracted) {
             setWaybill(extracted);
           } else {
-            Alert.alert('OCR', 'Nie rozpoznano numeru — wpisz ręcznie.');
+            Alert.alert('OCR', t('Nie rozpoznano numeru — wpisz recznie.'));
           }
         } finally {
           setIsScanning(false);
@@ -132,7 +134,7 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
       } else {
         // No OpenAI key — just set the photo so user can read it visually
         setPhotoUri(asset.uri);
-        Alert.alert('Wskazówka', 'Brak klucza OpenAI. Odczytaj numer z zdjęcia i wpisz ręcznie.');
+        Alert.alert(t('Wskazowka'), t('Brak klucza OpenAI. Odczytaj numer ze zdjecia i wpisz recznie.'));
       }
     } catch (err) {
       setIsScanning(false);
@@ -146,7 +148,7 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
     const dateValue = typeof selectedDay === 'string' && selectedDay.length >= 10
       ? selectedDay
       : now.toISOString().split('T')[0];
-    const timeValue = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+    const timeValue = now.toLocaleTimeString(language === 'de' ? 'de-DE' : 'pl-PL', { hour: '2-digit', minute: '2-digit' });
 
     await addDelivery({
       siteId,
@@ -165,7 +167,7 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.orange} />
       <AppHeader
-        title="Nowa dostawa"
+        title={t('Nowa dostawa')}
         subtitle={site?.name}
         showBack
         onBack={() => navigation.goBack()}
@@ -176,14 +178,14 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
 
         {/* ─── Asphalt class ─────────────────────────── */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Klasa asfaltu</Text>
+          <Text style={styles.fieldLabel}>{t('Klasa asfaltu')}</Text>
           <View style={styles.selectWrap}>
             <TouchableOpacity
               style={styles.selectBtn}
               onPress={() => { setShowNewClassInput(false); setNewClassInput(''); setClassPicker(true); }}
             >
               <Text style={[styles.selectText, !asphaltClass && styles.selectPlaceholder]}>
-                {asphaltClass || 'Wybierz klasę asfaltu'}
+                {asphaltClass || t('Wybierz klase asfaltu')}
               </Text>
               <Text style={styles.selectChevron}>▼</Text>
             </TouchableOpacity>
@@ -195,7 +197,7 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setClassPicker(false)} />
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Klasa asfaltu</Text>
+            <Text style={styles.modalTitle}>{t('Klasa asfaltu')}</Text>
 
             <FlatList
               data={availableClasses}
@@ -221,7 +223,7 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
                   style={styles.newClassInput}
                   value={newClassInput}
                   onChangeText={setNewClassInput}
-                  placeholder="np. AC 16"
+                  placeholder={t('np. AC 16')}
                   placeholderTextColor={Colors.grayLight}
                   autoFocus
                   autoCapitalize="characters"
@@ -237,31 +239,31 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
                     setNewClassInput('');
                   }}
                 >
-                  <Text style={styles.newClassConfirmText}>Dodaj</Text>
+                  <Text style={styles.newClassConfirmText}>{t('Dodaj')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity style={styles.addNewClassBtn} onPress={() => setShowNewClassInput(true)}>
-                <Text style={styles.addNewClassText}>＋ Dodaj nową klasę</Text>
+                <Text style={styles.addNewClassText}>＋ {t('Dodaj nowa klase')}</Text>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity style={styles.modalCancel} onPress={() => setClassPicker(false)}>
-              <Text style={styles.modalCancelText}>Anuluj</Text>
+              <Text style={styles.modalCancelText}>{t('Anuluj')}</Text>
             </TouchableOpacity>
           </KeyboardAvoidingView>
         </Modal>
 
         {/* ─── Weight ────────────────────────────────── */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Waga (tony)</Text>
+          <Text style={styles.fieldLabel}>{t('Waga (tony)')}</Text>
           <View style={styles.inputWrap}>
             <TextInput
               style={styles.input}
               value={weight}
               onChangeText={setWeight}
               keyboardType="decimal-pad"
-              placeholder="np. 24.5"
+              placeholder={t('np. 24.5')}
               placeholderTextColor={Colors.grayLight}
             />
             <Text style={styles.inputUnit}>t</Text>
@@ -270,13 +272,13 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
 
         {/* ─── Waybill ───────────────────────────────── */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>List przewozowy <Text style={styles.optional}>(opcjonalnie)</Text></Text>
+          <Text style={styles.fieldLabel}>{t('List przewozowy')} <Text style={styles.optional}>({t('opcjonalnie')})</Text></Text>
           <View style={[styles.inputWrap, { paddingRight: 52 }]}>
             <TextInput
               style={styles.input}
               value={waybill}
               onChangeText={setWaybill}
-              placeholder="np. LS-20240318-001"
+              placeholder={t('np. LS-20240318-001')}
               placeholderTextColor={Colors.grayLight}
             />
           </View>
@@ -291,35 +293,35 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
 
         {/* ─── Supplier ──────────────────────────────── */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Dostawca <Text style={styles.optional}>(opcjonalnie)</Text></Text>
+          <Text style={styles.fieldLabel}>{t('Dostawca')} <Text style={styles.optional}>({t('opcjonalnie')})</Text></Text>
           <TextInput
             style={styles.inputFull}
             value={supplier}
             onChangeText={setSupplier}
-            placeholder="np. Kemna Bau"
+            placeholder={t('np. Kemna Bau')}
             placeholderTextColor={Colors.grayLight}
           />
         </View>
 
         {/* ─── Photo ─────────────────────────────────── */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Zdjęcie <Text style={styles.optional}>(opcjonalnie)</Text></Text>
+          <Text style={styles.fieldLabel}>{t('Zdjecie')} <Text style={styles.optional}>({t('opcjonalnie')})</Text></Text>
           {photoUri ? (
             <View style={styles.photoPreview}>
               {/* Image preview */}
               <TouchableOpacity style={styles.removePhotoBtn} onPress={() => setPhotoUri(null)}>
-                <Text style={styles.removePhotoText}>✕ Usuń zdjęcie</Text>
+                <Text style={styles.removePhotoText}>✕ {t('Usun zdjecie')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.photoBtns}>
               <TouchableOpacity style={styles.photoBtn} onPress={handleCamera}>
                 <Text style={styles.photoBtnIcon}>📷</Text>
-                <Text style={styles.photoBtnText}>Aparat</Text>
+                <Text style={styles.photoBtnText}>{t('Aparat')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.photoBtn} onPress={handleGallery}>
                 <Text style={styles.photoBtnIcon}>🖼</Text>
-                <Text style={styles.photoBtnText}>Galeria</Text>
+                <Text style={styles.photoBtnText}>{t('Galeria')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -331,7 +333,7 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
       {/* Save button */}
       <View style={styles.saveBar}>
         <PrimaryButton
-          label="💾 Zapisz dostawę"
+          label={`💾 ${t('Zapisz dostawe')}`}
           onPress={handleSave}
           disabled={!isValid}
           fullWidth

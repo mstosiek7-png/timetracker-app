@@ -4,30 +4,36 @@
 
 import { MAX_HOURS_PER_DAY } from './constants';
 import { EmployeeInsert, TimeEntryInsert } from '@/types/models';
+import { strings, StringKey } from '../i18n/strings';
 
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
 }
 
+const defaultT = (key: StringKey) => strings.pl[key] ?? key;
+
 /**
  * Walidacja danych pracownika
  */
-export const validateEmployee = (data: Partial<EmployeeInsert>): ValidationResult => {
+export const validateEmployee = (
+  data: Partial<EmployeeInsert>,
+  t: (key: StringKey) => string = defaultT
+): ValidationResult => {
   const errors: string[] = [];
 
   if (!data.name || data.name.trim().length === 0) {
-    errors.push('Imię i nazwisko jest wymagane');
+    errors.push(t('Imie i nazwisko jest wymagane'));
   } else if (data.name.trim().length < 2) {
-    errors.push('Imię i nazwisko musi mieć minimum 2 znaki');
+    errors.push(t('Imie i nazwisko musi miec minimum 2 znaki'));
   } else if (data.name.trim().length > 255) {
-    errors.push('Imię i nazwisko może mieć maksymalnie 255 znaków');
+    errors.push(t('Imie i nazwisko moze miec maksymalnie 255 znakow'));
   }
 
   if (!data.position || data.position.trim().length === 0) {
-    errors.push('Stanowisko jest wymagane');
+    errors.push(t('Stanowisko jest wymagane'));
   } else if (data.position.trim().length > 100) {
-    errors.push('Stanowisko może mieć maksymalnie 100 znaków');
+    errors.push(t('Stanowisko moze miec maksymalnie 100 znakow'));
   }
 
   return {
@@ -39,29 +45,32 @@ export const validateEmployee = (data: Partial<EmployeeInsert>): ValidationResul
 /**
  * Walidacja wpisu czasu pracy
  */
-export const validateTimeEntry = (data: Partial<TimeEntryInsert>): ValidationResult => {
+export const validateTimeEntry = (
+  data: Partial<TimeEntryInsert>,
+  t: (key: StringKey) => string = defaultT
+): ValidationResult => {
   const errors: string[] = [];
 
   if (!data.employee_id) {
-    errors.push('Pracownik jest wymagany');
+    errors.push(t('Pracownik jest wymagany'));
   }
 
   if (!data.date) {
-    errors.push('Data jest wymagana');
+    errors.push(t('Data jest wymagana'));
   }
 
   if (data.hours === undefined || data.hours === null) {
-    errors.push('Liczba godzin jest wymagana');
+    errors.push(t('Liczba godzin jest wymagana'));
   } else if (data.hours < 0) {
-    errors.push('Liczba godzin nie może być ujemna');
+    errors.push(t('Liczba godzin nie moze byc ujemna'));
   } else if (data.hours > MAX_HOURS_PER_DAY) {
-    errors.push(`Liczba godzin nie może przekraczać ${MAX_HOURS_PER_DAY}`);
+    errors.push(`${t('Liczba godzin nie moze przekraczac')} ${MAX_HOURS_PER_DAY}`);
   }
 
   if (!data.status) {
-    errors.push('Status jest wymagany');
+    errors.push(t('Status jest wymagany'));
   } else if (!['work', 'sick', 'vacation', 'fza'].includes(data.status)) {
-    errors.push('Nieprawidłowy status');
+    errors.push(t('Nieprawidlowy status'));
   }
 
   return {
@@ -77,28 +86,29 @@ export const validateBulkEntry = (
   employeeIds: string[],
   date: string,
   hours: number,
-  status: string
+  status: string,
+  t: (key: StringKey) => string = defaultT
 ): ValidationResult => {
   const errors: string[] = [];
 
   if (!employeeIds || employeeIds.length === 0) {
-    errors.push('Wybierz przynajmniej jednego pracownika');
+    errors.push(t('Wybierz przynajmniej jednego pracownika'));
   }
 
   if (!date) {
-    errors.push('Data jest wymagana');
+    errors.push(t('Data jest wymagana'));
   }
 
   if (hours === undefined || hours === null) {
-    errors.push('Liczba godzin jest wymagana');
+    errors.push(t('Liczba godzin jest wymagana'));
   } else if (hours < 0) {
-    errors.push('Liczba godzin nie może być ujemna');
+    errors.push(t('Liczba godzin nie moze byc ujemna'));
   } else if (hours > MAX_HOURS_PER_DAY) {
-    errors.push(`Liczba godzin nie może przekraczać ${MAX_HOURS_PER_DAY}`);
+    errors.push(`${t('Liczba godzin nie moze przekraczac')} ${MAX_HOURS_PER_DAY}`);
   }
 
   if (!status) {
-    errors.push('Status jest wymagany');
+    errors.push(t('Status jest wymagany'));
   }
 
   return {

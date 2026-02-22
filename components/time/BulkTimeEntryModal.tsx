@@ -25,11 +25,12 @@ import {
 } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
-import { pl } from 'date-fns/locale';
+import { de, pl } from 'date-fns/locale';
 
 import { TimeEntryInsert, TimeEntryStatus } from '../../types/models';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useCreateBulkTimeEntries } from '../../hooks/useTimeEntries';
+import { useI18n } from '../../i18n/I18nProvider';
 
 // =====================================================
 // Types
@@ -66,6 +67,8 @@ export default function BulkTimeEntryModal({
   const [defaultStatus, setDefaultStatus] = useState<TimeEntryStatus>('work');
   const [employeeEntries, setEmployeeEntries] = useState<EmployeeEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const { t, language } = useI18n();
+  const locale = language === 'de' ? de : pl;
 
   // Hooks
   const { data: employees = [], isLoading: isLoadingEmployees } = useEmployees();
@@ -136,13 +139,13 @@ export default function BulkTimeEntryModal({
     });
 
     if (hasInvalidHours) {
-      Alert.alert('Błąd', 'Wprowadź poprawne wartości godzin (0-24) dla wybranych pracowników');
+      Alert.alert(t('Blad'), t('Wprowadz poprawne wartosci godzin (0-24) dla wybranych pracownikow'));
       return false;
     }
 
     const hasSelectedEmployees = employeeEntries.some(entry => entry.selected);
     if (!hasSelectedEmployees) {
-      Alert.alert('Błąd', 'Wybierz co najmniej jednego pracownika');
+      Alert.alert(t('Blad'), t('Wybierz co najmniej jednego pracownika'));
       return false;
     }
 
@@ -169,16 +172,16 @@ export default function BulkTimeEntryModal({
       await createBulkEntries(timeEntriesData);
 
       Alert.alert(
-        'Sukces',
-        `Dodano wpisy dla ${selectedEntries.length} pracowników`,
+        t('Sukces'),
+        `${t('Dodano wpisy dla')} ${selectedEntries.length} ${t('pracownikow')}`,
         [{ text: 'OK', onPress: handleClose }]
       );
 
       onSuccess?.();
     } catch (error) {
       Alert.alert(
-        'Błąd',
-        error instanceof Error ? error.message : 'Nie udało się zapisać wpisów'
+        t('Blad'),
+        error instanceof Error ? error.message : t('Nie udalo sie zapisac wpisow')
       );
     } finally {
       setIsSaving(false);
@@ -213,9 +216,9 @@ export default function BulkTimeEntryModal({
           <ScrollView>
             {/* Nagłówek */}
             <View style={styles.header}>
-              <Text style={styles.title}>Zbiorcze wprowadzanie godzin</Text>
+              <Text style={styles.title}>{t('Zbiorcze wprowadzanie godzin')}</Text>
               <Text style={styles.subtitle}>
-                Data: {format(date, 'dd.MM.yyyy', { locale: pl })}
+                {t('Data')}: {format(date, 'dd.MM.yyyy', { locale })}
               </Text>
             </View>
 
@@ -223,11 +226,11 @@ export default function BulkTimeEntryModal({
 
             {/* Ustawienia domyślne */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Ustawienia domyślne</Text>
+              <Text style={styles.sectionTitle}>{t('Ustawienia domyslne')}</Text>
               
               <View style={styles.defaultSettings}>
                 <View style={styles.defaultInput}>
-                  <Text style={styles.label}>Domyślne godziny</Text>
+                  <Text style={styles.label}>{t('Domyslne godziny')}</Text>
                   <TextInput
                     value={defaultHours}
                     onChangeText={setDefaultHours}
@@ -238,12 +241,12 @@ export default function BulkTimeEntryModal({
                     error={!isValidHours(defaultHours)}
                   />
                   <HelperText type="error" visible={!isValidHours(defaultHours)}>
-                    Nieprawidłowe godziny
+                    {t('Nieprawidlowe godziny')}
                   </HelperText>
                 </View>
 
                 <View style={styles.defaultInput}>
-                  <Text style={styles.label}>Domyślny status</Text>
+                  <Text style={styles.label}>{t('Domyslny status')}</Text>
                   <View style={styles.statusChips}>
                     {(['work', 'sick', 'vacation', 'fza'] as TimeEntryStatus[]).map(stat => (
                       <Chip
@@ -252,7 +255,7 @@ export default function BulkTimeEntryModal({
                         onPress={() => setDefaultStatus(stat)}
                         style={styles.statusChip}
                       >
-                        {getStatusLabel(stat)}
+                        {getStatusLabel(stat, t)}
                       </Chip>
                     ))}
                   </View>
@@ -266,7 +269,7 @@ export default function BulkTimeEntryModal({
                   disabled={isLoading}
                   compact
                 >
-                  Zastosuj do wszystkich
+                  {t('Zastosuj do wszystkich')}
                 </Button>
               </View>
             </View>
@@ -275,7 +278,7 @@ export default function BulkTimeEntryModal({
 
             {/* Kalendarz */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Data</Text>
+              <Text style={styles.sectionTitle}>{t('Data')}</Text>
               <Button
                 mode="outlined"
                 onPress={() => setShowDatePicker(true)}
@@ -283,7 +286,7 @@ export default function BulkTimeEntryModal({
                 icon="calendar"
                 disabled={isLoading}
               >
-                Wybierz datę
+                {t('Wybierz date')}
               </Button>
               {showDatePicker && (
                 <DateTimePicker
@@ -301,7 +304,7 @@ export default function BulkTimeEntryModal({
             {/* Lista pracowników */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Pracownicy</Text>
+                <Text style={styles.sectionTitle}>{t('Pracownicy')}</Text>
                 <View style={styles.sectionActions}>
                   <Button
                     mode="text"
@@ -317,13 +320,13 @@ export default function BulkTimeEntryModal({
                     disabled={isLoading}
                     compact
                   >
-                    Odznacz wszystkich
+                    {t('Odznacz wszystkich')}
                   </Button>
                 </View>
               </View>
 
               <Text style={styles.hint}>
-                Wybrano: {selectedCount} z {employeeEntries.length} pracowników
+                {t('Wybrano')}: {selectedCount} {t('z')} {employeeEntries.length} {t('pracownikow')}
               </Text>
 
               {isLoadingEmployees ? (
@@ -331,10 +334,10 @@ export default function BulkTimeEntryModal({
               ) : (
                 <DataTable>
                   <DataTable.Header>
-                    <DataTable.Title>Wybór</DataTable.Title>
-                    <DataTable.Title>Pracownik</DataTable.Title>
-                    <DataTable.Title numeric>Godziny</DataTable.Title>
-                    <DataTable.Title>Status</DataTable.Title>
+                    <DataTable.Title>{t('Wybor')}</DataTable.Title>
+                    <DataTable.Title>{t('Pracownik')}</DataTable.Title>
+                    <DataTable.Title numeric>{t('Godziny')}</DataTable.Title>
+                    <DataTable.Title>{t('Status')}</DataTable.Title>
                   </DataTable.Header>
 
                   {employeeEntries.map(entry => (
@@ -379,7 +382,7 @@ export default function BulkTimeEntryModal({
                               style={styles.smallChip}
                               compact
                             >
-                              {getStatusLabel(stat).substring(0, 3)}
+                              {getStatusLabel(stat, t).substring(0, 3)}
                             </Chip>
                           ))}
                         </View>
@@ -398,7 +401,7 @@ export default function BulkTimeEntryModal({
                 style={styles.cancelButton}
                 disabled={isLoading}
               >
-                Anuluj
+                {t('Anuluj')}
               </Button>
               <Button
                 mode="contained"
@@ -408,7 +411,7 @@ export default function BulkTimeEntryModal({
                 style={styles.saveButton}
                 icon="check-all"
               >
-                Zapisz ({selectedCount})
+                {t('Zapisz')} ({selectedCount})
               </Button>
             </View>
           </ScrollView>
@@ -422,12 +425,12 @@ export default function BulkTimeEntryModal({
 // Helper Functions
 // =====================================================
 
-function getStatusLabel(status: TimeEntryStatus): string {
+function getStatusLabel(status: TimeEntryStatus, t: (key: string) => string): string {
   const labels = {
-    work: 'Praca',
-    sick: 'Chorobowe',
-    vacation: 'Urlop',
-    fza: 'FZA',
+    work: t('Praca'),
+    sick: t('Chorobowe'),
+    vacation: t('Urlop'),
+    fza: t('FZA'),
   };
   return labels[status];
 }

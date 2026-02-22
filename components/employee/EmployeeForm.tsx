@@ -18,6 +18,7 @@ import { useCreateEmployee, useUpdateEmployee } from '../../hooks/useEmployees';
 import { OutlineButton, PrimaryButton, Checkbox } from '../ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius } from '../../theme';
 import { EmployeeInsert, EmployeeUpdate } from '../../types/models';
+import { useI18n } from '../../i18n/I18nProvider';
 
 interface EmployeeFormProps {
   visible: boolean;
@@ -44,6 +45,7 @@ export function EmployeeForm({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { t } = useI18n();
 
   const createMutation = useCreateEmployee();
   const updateMutation = useUpdateEmployee();
@@ -54,11 +56,11 @@ export function EmployeeForm({
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = 'Imię i nazwisko są wymagane';
+      newErrors.name = t('Imie i nazwisko sa wymagane');
     }
 
     if (!formData.position.trim()) {
-      newErrors.position = 'Stanowisko jest wymagane';
+      newErrors.position = t('Stanowisko jest wymagane');
     }
 
     setErrors(newErrors);
@@ -78,7 +80,7 @@ export function EmployeeForm({
           active: formData.active,
         });
 
-        Alert.alert('Sukces', 'Pracownik został dodany pomyślnie');
+        Alert.alert(t('Sukces'), t('Pracownik zostal dodany pomyslnie'));
       } else if (employee) {
         await updateMutation.mutateAsync({
           id: employee.id,
@@ -87,14 +89,14 @@ export function EmployeeForm({
           active: formData.active,
         });
 
-        Alert.alert('Sukces', 'Dane pracownika zostały zaktualizowane');
+        Alert.alert(t('Sukces'), t('Dane pracownika zostaly zaktualizowane'));
       }
 
       handleClose();
     } catch (error) {
       Alert.alert(
-        'Błąd',
-        error instanceof Error ? error.message : 'Wystąpił nieoczekiwany błąd'
+        t('Blad'),
+        error instanceof Error ? error.message : t('Wystapil nieoczekiwany blad')
       );
     }
   };
@@ -125,18 +127,18 @@ export function EmployeeForm({
           {/* ─── Colored header ────────────────────── */}
           <View style={styles.colorHeader}>
             <View style={styles.handle} />
-            <Text style={styles.headerTitle}>{mode === 'create' ? 'Dodaj pracownika' : 'Edytuj pracownika'}</Text>
+            <Text style={styles.headerTitle}>{mode === 'create' ? t('Dodaj pracownika') : t('Edytuj pracownika')}</Text>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* ─── Name ──────────────────────────────── */}
             <View style={styles.section}>
-              <Text style={styles.label}>Imię i nazwisko</Text>
+              <Text style={styles.label}>{t('Imie i nazwisko')}</Text>
               <TextInput
                 style={[styles.input, errors.name && styles.inputError]}
                 value={formData.name}
                 onChangeText={(value) => handleInputChange('name', value)}
-                placeholder="Np. Jan Kowalski"
+                placeholder={t('Np. Jan Kowalski')}
                 maxLength={255}
                 autoCapitalize="words"
                 placeholderTextColor={Colors.grayLight}
@@ -146,12 +148,12 @@ export function EmployeeForm({
 
             {/* ─── Position ──────────────────────────– */}
             <View style={styles.section}>
-              <Text style={styles.label}>Stanowisko</Text>
+              <Text style={styles.label}>{t('Stanowisko')}</Text>
               <TextInput
                 style={[styles.input, errors.position && styles.inputError]}
                 value={formData.position}
                 onChangeText={(value) => handleInputChange('position', value)}
-                placeholder="Np. Kierownik budowy"
+                placeholder={t('Np. Kierownik budowy')}
                 maxLength={100}
                 autoCapitalize="words"
                 placeholderTextColor={Colors.grayLight}
@@ -163,9 +165,9 @@ export function EmployeeForm({
             <View style={styles.section}>
               <View style={styles.checkboxRow}>
                 <Checkbox checked={formData.active} onToggle={() => handleInputChange('active', !formData.active)} />
-                <Text style={styles.checkboxLabel}>Aktywny pracownik</Text>
+                <Text style={styles.checkboxLabel}>{t('Aktywny pracownik')}</Text>
               </View>
-              <Text style={styles.helperText}>Nieaktywni pracownicy nie będą wyświetlani przy dodawaniu godzin</Text>
+              <Text style={styles.helperText}>{t('Nieaktywni pracownicy nie beda wyswietlani przy dodawaniu godzin')}</Text>
             </View>
 
             <View style={{ height: Spacing.xxxl }} />
@@ -173,9 +175,9 @@ export function EmployeeForm({
 
           {/* Footer */}
           <View style={styles.footer}>
-            <OutlineButton label="Anuluj" onPress={handleClose} style={{ flex: 1, minHeight: 52 }} />
+            <OutlineButton label={t('Anuluj')} onPress={handleClose} style={{ flex: 1, minHeight: 52 }} />
             <PrimaryButton
-              label={mode === 'create' ? 'Dodaj pracownika' : 'Zapisz'}
+              label={mode === 'create' ? t('Dodaj pracownika') : t('Zapisz')}
               onPress={handleSubmit}
               loading={isLoading}
               style={{ flex: 1, minHeight: 52 }}

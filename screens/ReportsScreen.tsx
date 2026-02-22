@@ -14,6 +14,7 @@ import { AppHeader, Badge, Checkbox, BottomNav, PrimaryButton } from '../compone
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../theme';
 import { useReports } from '../hooks/useReports';
 import { useWorkers } from '../hooks/useWorkers';
+import { useI18n } from '../i18n/I18nProvider';
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 type RangeMode = 'current' | 'previous' | 'custom';
@@ -21,7 +22,8 @@ type ExportFormat = 'xlsx' | 'pdf';
 
 export default function ReportsScreen({ navigation }: Props) {
   const { workers } = useWorkers();
-  const { useReportStats, generateReport } = useReports();
+  const { generateReport, savedReports, shareExistingReport } = useReports();
+  const { t } = useI18n();
 
   const [rangeMode, setRangeMode] = useState<RangeMode>('current');
   const [dateFrom, setDateFrom] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -32,9 +34,6 @@ export default function ReportsScreen({ navigation }: Props) {
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker]     = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const { data: stats = { totalHours: 0, entryCount: 0, workerCount: workers.length, byStatus: { praca: 0, chorobowe: 0, urlop: 0, fza: 0 } } } =
-    useReportStats({ dateFrom, dateTo, workerIds: selectedWorkers });
 
   function setRange(mode: RangeMode) {
     setRangeMode(mode);
@@ -74,13 +73,13 @@ export default function ReportsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.orange} />
-      <AppHeader title="Raporty i Eksport" />
+      <AppHeader title={t('Raporty i Eksport')} />
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         {/* ─── Date range ────────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Zakres dat</Text>
+          <Text style={styles.cardTitle}>{t('Zakres dat')}</Text>
           <View style={styles.dateTabs}>
             {(['current','previous','custom'] as RangeMode[]).map((mode, i) => (
               <TouchableOpacity
@@ -89,21 +88,21 @@ export default function ReportsScreen({ navigation }: Props) {
                 onPress={() => setRange(mode)}
               >
                 <Text style={[styles.dateTabText, rangeMode === mode && styles.dateTabTextActive]}>
-                  {['Bieżący miesiąc','Poprzedni miesiąc','Niestandardowy'][i]}
+                  {[t('Biezacy miesiac'), t('Poprzedni miesiac'), t('Niestandardowy')][i]}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
           <View style={styles.dateRangeRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rangeLabel}>Od:</Text>
+              <Text style={styles.rangeLabel}>{t('Od')}:</Text>
               <TouchableOpacity style={styles.rangeBtn} onPress={() => setShowFromPicker(true)}>
                 <Text>📅 </Text>
                 <Text style={styles.rangeBtnText}>{fmt(dateFrom)}</Text>
               </TouchableOpacity>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rangeLabel}>Do:</Text>
+              <Text style={styles.rangeLabel}>{t('Do')}:</Text>
               <TouchableOpacity style={styles.rangeBtn} onPress={() => setShowToPicker(true)}>
                 <Text>📅 </Text>
                 <Text style={styles.rangeBtnText}>{fmt(dateTo)}</Text>
@@ -119,17 +118,17 @@ export default function ReportsScreen({ navigation }: Props) {
         {/* ─── Workers filter ────────────────────────── */}
         <View style={styles.card}>
           <View style={styles.filterHeader}>
-            <Text style={styles.cardTitle}>Pracownicy</Text>
+            <Text style={styles.cardTitle}>{t('Pracownicy')}</Text>
             <View style={styles.workerActions}>
               <TouchableOpacity onPress={() => setSelectedWorkers(workers.map(w => w.id))}>
-                <Text style={styles.filterAction}>Zaznacz wszystkich</Text>
+                <Text style={styles.filterAction}>{t('Zaznacz wszystkich')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setSelectedWorkers([])}>
-                <Text style={styles.filterActionGray}>Wyczyść</Text>
+                <Text style={styles.filterActionGray}>{t('Wyczysc')}</Text>
               </TouchableOpacity>
             </View>
           </View>
-          <Text style={styles.filterHint}>Wszyscy pracownicy (wybierz konkretnych jeśli potrzebujesz)</Text>
+            <Text style={styles.filterHint}>{t('Wszyscy pracownicy (wybierz konkretnych jesli potrzebujesz)')}</Text>
           <View style={styles.workerChips}>
             {workers.map(w => (
               <TouchableOpacity
@@ -149,7 +148,7 @@ export default function ReportsScreen({ navigation }: Props) {
 
         {/* ─── Export options ────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Opcje eksportu</Text>
+          <Text style={styles.cardTitle}>{t('Opcje eksportu')}</Text>
           <View style={styles.exportCards}>
             <TouchableOpacity
               style={[styles.exportCard, exportFormat === 'xlsx' && styles.exportCardSelected]}
@@ -157,7 +156,7 @@ export default function ReportsScreen({ navigation }: Props) {
             >
               <Text style={styles.exportIcon}>📊</Text>
               <Text style={[styles.exportName, exportFormat === 'xlsx' && styles.exportNameSelected]}>Excel (.xlsx)</Text>
-              <Text style={[styles.exportHint, exportFormat === 'xlsx' && styles.exportHintSelected]}>Edytowalny</Text>
+              <Text style={[styles.exportHint, exportFormat === 'xlsx' && styles.exportHintSelected]}>{t('Edytowalny')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.exportCard, exportFormat === 'pdf' && styles.exportCardSelected]}
@@ -165,35 +164,41 @@ export default function ReportsScreen({ navigation }: Props) {
             >
               <Text style={styles.exportIcon}>📄</Text>
               <Text style={[styles.exportName, exportFormat === 'pdf' && styles.exportNameSelected]}>PDF (.pdf)</Text>
-              <Text style={[styles.exportHint, exportFormat === 'pdf' && styles.exportHintSelected]}>Do druku</Text>
+              <Text style={[styles.exportHint, exportFormat === 'pdf' && styles.exportHintSelected]}>{t('Do druku')}</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.notesRow} onPress={() => setIncludeNotes(v => !v)}>
             <Checkbox checked={includeNotes} onToggle={() => setIncludeNotes(v => !v)} />
-            <Text style={styles.notesLabel}>Uwzględnij notatki</Text>
+            <Text style={styles.notesLabel}>{t('Uwzglednij notatki')}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* ─── Status summary ────────────────────────── */}
+        {/* ─── Saved reports ─────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Podsumowanie statusów</Text>
-          {[
-            { key: 'praca',     label: 'PRACA',      hours: stats.byStatus.praca },
-            { key: 'chorobowe', label: 'CHOROBOWE',  hours: stats.byStatus.chorobowe },
-            { key: 'urlop',     label: 'URLOP',       hours: stats.byStatus.urlop },
-            { key: 'fza',       label: 'FZA',         hours: stats.byStatus.fza },
-          ].map(s => (
-            <View key={s.key} style={styles.statusSummaryRow}>
-              <Badge label={s.label} variant={s.key as any} />
-              <Text style={[styles.statusHours, s.hours === 0 && styles.statusHoursZero]}>{s.hours}h</Text>
-            </View>
-          ))}
+          <Text style={styles.cardTitle}>{t('Zapisane raporty')}</Text>
+          {savedReports.length === 0 ? (
+            <Text style={styles.emptyReports}>{t('Brak zapisanych raportow')}</Text>
+          ) : (
+            savedReports.map(report => (
+              <TouchableOpacity
+                key={report.id}
+                style={styles.savedReportRow}
+                onPress={() => shareExistingReport(report)}
+              >
+                <View>
+                  <Text style={styles.savedReportName}>{report.name}</Text>
+                  <Text style={styles.savedReportMeta}>{report.createdAt}</Text>
+                </View>
+                <Text style={styles.savedReportAction}>{t('Udostepnij')}</Text>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         {/* ─── Generate ──────────────────────────────── */}
         <View style={styles.exportBtnWrap}>
           <PrimaryButton
-            label="⬇ Eksportuj raport"
+            label={t('Wygeneruj raport')}
             onPress={handleGenerate}
             loading={loading}
             fullWidth size="lg"
@@ -218,6 +223,18 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 10, fontFamily: FontFamily.bold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 },
   dateTabs: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  emptyReports: { fontSize: 12, color: Colors.grayMid, fontStyle: 'italic' },
+  savedReportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.creamDark,
+  },
+  savedReportName: { fontSize: 14, fontFamily: FontFamily.bold, color: Colors.black },
+  savedReportMeta: { fontSize: 11, color: Colors.grayMid, marginTop: 2 },
+  savedReportAction: { fontSize: 12, fontFamily: FontFamily.bold, color: Colors.orange },
   dateTab: {
     flex: 1, paddingVertical: 9, paddingHorizontal: 6,
     backgroundColor: Colors.cream, borderRadius: 20,

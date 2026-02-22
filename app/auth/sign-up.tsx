@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { theme } from '../../constants/theme';
 import { supabase } from '../../services/supabase';
+import { useI18n } from '../../i18n/I18nProvider';
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -26,32 +27,33 @@ export default function SignUpScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const { t } = useI18n();
 
   // Walidacja formularza
   const validateForm = () => {
     if (!email.trim()) {
-      Alert.alert('Błąd', 'Podaj adres email');
+      Alert.alert(t('Blad'), t('Podaj adres email'));
       return false;
     }
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('Błąd', 'Podaj poprawny adres email');
+      Alert.alert(t('Blad'), t('Podaj poprawny adres email'));
       return false;
     }
 
     if (!password.trim()) {
-      Alert.alert('Błąd', 'Podaj hasło');
+      Alert.alert(t('Blad'), t('Podaj haslo'));
       return false;
     }
 
     if (password.length < 6) {
-      Alert.alert('Błąd', 'Hasło musi mieć co najmniej 6 znaków');
+      Alert.alert(t('Blad'), t('Haslo musi miec co najmniej 6 znakow'));
       return false;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Błąd', 'Hasła nie są identyczne');
+      Alert.alert(t('Blad'), t('Hasla nie sa identyczne'));
       return false;
     }
 
@@ -90,8 +92,8 @@ export default function SignUpScreen() {
     } catch (error: any) {
       console.error('Błąd rejestracji:', error);
       Alert.alert(
-        'Błąd rejestracji',
-        error.message || 'Nie udało się utworzyć konta. Spróbuj ponownie.'
+        t('Blad rejestracji'),
+        error.message || t('Nie udalo sie utworzyc konta. Sprobuj ponownie.')
       );
     } finally {
       setIsLoading(false);
@@ -112,7 +114,7 @@ export default function SignUpScreen() {
       if (error) throw error;
     } catch (error: any) {
       console.error('Błąd rejestracji przez Google:', error);
-      Alert.alert('Błąd', 'Nie udało się zarejestrować przez Google');
+      Alert.alert(t('Blad'), t('Nie udalo sie zarejestrowac przez Google'));
     } finally {
       setIsGoogleLoading(false);
     }
@@ -131,19 +133,19 @@ export default function SignUpScreen() {
         {/* Nagłówek */}
         <View style={styles.header}>
           <Text style={styles.title}>TimeTracker</Text>
-          <Text style={styles.subtitle}>Utwórz nowe konto</Text>
+          <Text style={styles.subtitle}>{t('Utworz nowe konto')}</Text>
         </View>
 
         {/* Formularz rejestracji */}
         <View style={styles.form}>
           {/* Email */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email</Text>
+            <Text style={styles.inputLabel}>{t('Email')}</Text>
             <TextInput
               style={styles.textInput}
               value={email}
               onChangeText={setEmail}
-              placeholder="twój@email.com"
+              placeholder={t('twoj@email.com')}
               placeholderTextColor={theme.colors.muted}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -153,7 +155,7 @@ export default function SignUpScreen() {
 
           {/* Hasło */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Hasło</Text>
+            <Text style={styles.inputLabel}>{t('Haslo')}</Text>
             <TextInput
               style={styles.textInput}
               value={password}
@@ -165,13 +167,13 @@ export default function SignUpScreen() {
               autoCorrect={false}
             />
             <Text style={styles.passwordHint}>
-              Minimum 6 znaków
+              {t('Minimum 6 znakow')}
             </Text>
           </View>
 
           {/* Potwierdzenie hasła */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Potwierdź hasło</Text>
+            <Text style={styles.inputLabel}>{t('Potwierdz haslo')}</Text>
             <TextInput
               style={styles.textInput}
               value={confirmPassword}
@@ -191,16 +193,16 @@ export default function SignUpScreen() {
             disabled={isLoading}
           >
             {isLoading ? (
-              <Text style={styles.signUpButtonText}>Rejestracja...</Text>
+              <Text style={styles.signUpButtonText}>{t('Rejestracja...')}</Text>
             ) : (
-              <Text style={styles.signUpButtonText}>Zarejestruj się</Text>
+              <Text style={styles.signUpButtonText}>{t('Zarejestruj sie')}</Text>
             )}
           </TouchableOpacity>
 
           {/* Separator */}
           <View style={styles.separator}>
             <View style={styles.separatorLine} />
-            <Text style={styles.separatorText}>lub</Text>
+            <Text style={styles.separatorText}>{t('lub')}</Text>
             <View style={styles.separatorLine} />
           </View>
 
@@ -212,15 +214,15 @@ export default function SignUpScreen() {
           >
             <Ionicons name="logo-google" size={20} color={theme.colors.dark} />
             <Text style={styles.googleButtonText}>
-              {isGoogleLoading ? 'Łączenie...' : 'Kontynuuj przez Google'}
+              {isGoogleLoading ? t('Laczenie...') : t('Kontynuuj przez Google')}
             </Text>
           </TouchableOpacity>
 
           {/* Link do logowania */}
           <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Masz już konto? </Text>
+            <Text style={styles.loginText}>{t('Masz juz konto?')} </Text>
             <Link href="/auth/sign-in" style={styles.loginLink}>
-              <Text style={styles.loginLinkText}>Zaloguj się</Text>
+              <Text style={styles.loginLinkText}>{t('Zaloguj sie')}</Text>
             </Link>
           </View>
         </View>
@@ -228,13 +230,13 @@ export default function SignUpScreen() {
         {/* Informacja o prywatności */}
         <View style={styles.privacyContainer}>
           <Text style={styles.privacyText}>
-            Rejestrując się akceptujesz{' '}
+            {t('Rejestrujac sie akceptujesz')}{' '}
             <Link href="/privacy" style={styles.privacyLink}>
-              <Text style={styles.privacyLinkText}>Warunki korzystania</Text>
+              <Text style={styles.privacyLinkText}>{t('Warunki korzystania')}</Text>
             </Link>{' '}
-            i{' '}
+            {t('i')}{' '}
             <Link href="/privacy" style={styles.privacyLink}>
-              <Text style={styles.privacyLinkText}>Politykę prywatności</Text>
+              <Text style={styles.privacyLinkText}>{t('Polityke prywatnosci')}</Text>
             </Link>
           </Text>
         </View>

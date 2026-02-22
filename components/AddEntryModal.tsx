@@ -8,6 +8,7 @@ import {
   StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { format } from 'date-fns';
 import { RadioOption, StatusChip, PrimaryButton, OutlineButton } from './ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../theme';
 import { useWorkers } from '../hooks/useWorkers';
@@ -16,6 +17,7 @@ import {
   useUpdateTimeEntry,
   useTimeEntry,
 } from '../hooks/useTimeEntries';
+import { useI18n } from '../i18n/I18nProvider';
 
 interface Props {
   visible: boolean;
@@ -23,13 +25,14 @@ interface Props {
   entryId?: string;  // jeśli podany → tryb edycji
 }
 
-const STATUSES = ['Praca', 'Chorobowe', 'Urlop', 'FZA'];
+const STATUS_KEYS = ['Praca', 'Chorobowe', 'Urlop', 'FZA'];
 
 export function AddEntryModal({ visible, onClose, entryId }: Props) {
   const { workers } = useWorkers();
   const createEntry  = useCreateTimeEntry();
   const updateEntry  = useUpdateTimeEntry();
   const { data: existingEntry } = useTimeEntry(entryId ?? '');
+  const { t, language } = useI18n();
 
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
   const [date, setDate] = useState(new Date());
@@ -55,7 +58,7 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
   const totalHours = status === 'Praca' ? Math.max(0, (endTime.getTime() - startTime.getTime()) / 3600000) : 0;
 
   const formatTime = (d: Date) =>
-    d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+    d.toLocaleTimeString(language === 'de' ? 'de-DE' : 'pl-PL', { hour: '2-digit', minute: '2-digit' });
 
   const formatDate = (d: Date) =>
     d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -69,7 +72,7 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
       await updateEntry.mutateAsync({
         id: entryId,
         employee_id: selectedWorker,
-        date: date.toISOString().split('T')[0],
+        date: format(date, 'yyyy-MM-dd'),
         hours: totalHours,
         status: dbStatus as any,
         notes: null,
@@ -77,7 +80,7 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
     } else {
       await createEntry.mutateAsync({
         employee_id: selectedWorker,
-        date: date.toISOString().split('T')[0],
+        date: format(date, 'yyyy-MM-dd'),
         hours: totalHours,
         status: dbStatus as any,
         notes: null,
@@ -99,7 +102,7 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
 
           {/* Header */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{entryId ? 'Edytuj wpis' : 'Dodaj wpis czasu pracy'}</Text>
+            <Text style={styles.modalTitle}>{entryId ? t('Edytuj wpis') : t('Dodaj wpis czasu pracy')}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
@@ -108,7 +111,7 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* ─── Worker ──────────────────────────────── */}
             <View style={styles.section}>
-              <Text style={styles.label}>Pracownik *</Text>
+              <Text style={styles.label}>{t('Pracownik')} *</Text>
               <View style={styles.radioGroup}>
                 {workers.map(w => (
                   <RadioOption
@@ -123,7 +126,7 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
 
             {/* ─── Date ────────────────────────────────── */}
             <View style={styles.section}>
-              <Text style={styles.label}>Data *</Text>
+              <Text style={styles.label}>{t('Data')} *</Text>
               <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
                 <Text style={styles.dateBtnIcon}>📅</Text>
                 <Text style={styles.dateBtnText}>{formatDate(date)}</Text>
@@ -138,10 +141,10 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
 
             {/* ─── Status ──────────────────────────────── */}
             <View style={styles.section}>
-              <Text style={styles.label}>Status *</Text>
+              <Text style={styles.label}>{t('Status')} *</Text>
               <View style={styles.statusChips}>
-                {STATUSES.map(s => (
-                  <StatusChip key={s} label={s} selected={status === s} onPress={() => setStatus(s)} />
+                {STATUS_KEYS.map(s => (
+                  <StatusChip key={s} label={t(s)} selected={status === s} onPress={() => setStatus(s)} />
                 ))}
               </View>
             </View>
@@ -149,7 +152,7 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
             {/* ─── Hours (tylko dla Pracy) ───────────────────────────────── */}
             {status === 'Praca' && (
               <View style={styles.section}>
-                <Text style={styles.label}>Godziny pracy *</Text>
+                <Text style={styles.label}>{t('Godziny pracy')} *</Text>
                 <View style={styles.timeRow}>
                   <TouchableOpacity style={styles.timeBtn} onPress={() => setShowStartPicker(true)}>
                     <Text style={styles.timeBtnIcon}>🕐</Text>
@@ -162,7 +165,7 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
                   </TouchableOpacity>
                   <Text style={styles.totalHours}>{totalHours.toFixed(0)}h</Text>
                 </View>
-                <Text style={styles.timeHint}>Godziny obliczane są automatycznie</Text>
+                <Text style={styles.timeHint}>{t('Godziny obliczane sa automatycznie')}</Text>
                 {showStartPicker && (
                   <DateTimePicker value={startTime} mode="time" is24Hour
                     onChange={(_, d) => { setShowStartPicker(false); if (d) setStartTime(d); }} />
@@ -179,9 +182,9 @@ export function AddEntryModal({ visible, onClose, entryId }: Props) {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <OutlineButton label="Anuluj" onPress={onClose} style={{ flex: 1 }} />
+            <OutlineButton label={t('Anuluj')} onPress={onClose} style={{ flex: 1 }} />
             <PrimaryButton
-              label="💾 Zapisz wpis"
+              label={`💾 ${t('Zapisz wpis')}`}
               onPress={handleSave}
               disabled={!selectedWorker}
               style={{ flex: 2 }}

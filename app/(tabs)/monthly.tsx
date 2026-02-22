@@ -2,7 +2,7 @@
 // MonthlyViewScreen - Widok miesięczny pracownika
 // =====================================================
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -10,6 +10,8 @@ import {
   TouchableOpacity,
   Text,
   Modal,
+  TextInput,
+  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,16 +19,17 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, parseISO, eachDayOfInterval, startOfMonth, endOfMonth,
          isSameMonth, isSameDay, addMonths, subMonths,
          startOfWeek, endOfWeek } from 'date-fns';
-import { pl } from 'date-fns/locale';
+import { de, pl } from 'date-fns/locale';
 
 import { useLocalSearchParams } from 'expo-router';
 
 import { useEmployees } from '../../hooks/useEmployees';
-import { useMonthlySummary } from '../../hooks/useTimeEntries';
+import { useCreateTimeEntry, useDeleteTimeEntry, useMonthlySummary } from '../../hooks/useTimeEntries';
 import { TimeEntryStatus } from '../../types/models';
 import { theme, StatusType } from '../../constants/theme';
 import { Card, PageHeader, SectionTitle, StatBox, StatusBadge } from '../../components/ui/index';
 import { formatHours } from '../../utils/formatting';
+import { useI18n } from '../../i18n/I18nProvider';
 
 // =====================================================
 // Types
@@ -49,13 +52,30 @@ interface DayCell {
 
 export default function MonthlyViewScreen() {
   // URL params — workerId przekazywane po kliknięciu wpisu na dashboardzie
-  const { workerId: paramWorkerId } = useLocalSearchParams<{ workerId?: string }>();
+  const { workerId: paramWorkerId } = useLocalSearchParams<{ workerId?: string | string[] }>();
+  const normalizedWorkerId = Array.isArray(paramWorkerId) ? paramWorkerId[0] : paramWorkerId;
+
+  const today = new Date();
 
   // State
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(paramWorkerId ?? '');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(normalizedWorkerId ?? '');
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [viewMode, setViewMode] = useState<'calendar' | 'summary'>('calendar');
+  const [editDay, setEditDay] = useState<Date | null>(null);
+  const [editEntryId, setEditEntryId] = useState<string | null>(null);
+  const [editStatus, setEditStatus] = useState<TimeEntryStatus>('work');
+  const [editHours, setEditHours] = useState('8');
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { t, language } = useI18n();
+  const locale = language === 'de' ? de : pl;
+  const weekDayLabels = language === 'de'
+    ? ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+    : ['Pn', 'Wt', 'Sr', 'Cz', 'Pt', 'So', 'Nd'];
 
   // Hooks
   const { data: employees = [], isLoading: isLoadingEmployees } = useEmployees();
@@ -64,12 +84,101 @@ export default function MonthlyViewScreen() {
     selectedDate.getFullYear(),
     selectedDate.getMonth() + 1
   );
+  const createTimeEntry = useCreateTimeEntry();
+  const deleteTimeEntry = useDeleteTimeEntry();
 
   // =====================================================
   // Computed Values
   // =====================================================
 
   const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
+
+  useEffect(() => {
+    if (normalizedWorkerId && normalizedWorkerId !== selectedEmployeeId) {
+      setSelectedEmployeeId(normalizedWorkerId);
+    }
+  }, [normalizedWorkerId, selectedEmployeeId]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      setToastVisible(false);
+    }, 2200);
+  };
+
+  const statusOptions: Array<{ value: TimeEntryStatus; label: string }> = [
+    { value: 'work', label: t('Praca') },
+    { value: 'sick', label: t('Chorobowe') },
+    { value: 'vacation', label: t('Urlop') },
+    { value: 'fza', label: t('FZA') },
+  ];
+
+  const openDayEditor = (date: Date) => {
+    if (!selectedEmployeeId) {
+      return;
+    }
+    const existingEntry = timeEntries.find(entry => isSameDay(parseISO(entry.date), date));
+    setEditDay(date);
+    setEditEntryId(existingEntry?.id ?? null);
+    setEditStatus(existingEntry?.status ?? 'work');
+    setEditHours(existingEntry ? String(existingEntry.hours) : '8');
+    setEditError('');
+    setIsEditOpen(true);
+  };
+
+  const closeDayEditor = () => {
+    setIsEditOpen(false);
+    setEditError('');
+  };
+
+  const handleDeleteDay = async () => {
+    if (!editEntryId) {
+      return;
+    }
+    Alert.alert(t('Usun wpis'), t('Czy na pewno usunac ten wpis?'), [
+      { text: t('Anuluj'), style: 'cancel' },
+      {
+        text: t('Usun'),
+        style: 'destructive',
+        onPress: async () => {
+          await deleteTimeEntry.mutateAsync(editEntryId);
+          closeDayEditor();
+          showToast(t('Wpis usuniety.'));
+        },
+      },
+    ]);
+  };
+
+  const handleSaveDay = async () => {
+    if (!selectedEmployeeId || !editDay) {
+      return;
+    }
+    const hoursValue = editStatus === 'work' ? parseFloat(editHours) || 0 : 0;
+    if (editStatus === 'work' && hoursValue <= 0) {
+      setEditError(t('Wprowadz poprawne godziny dla statusu Praca.'));
+      return;
+    }
+    await createTimeEntry.mutateAsync({
+      employee_id: selectedEmployeeId,
+      date: format(editDay, 'yyyy-MM-dd'),
+      hours: hoursValue,
+      status: editStatus,
+      notes: null,
+    });
+    closeDayEditor();
+  };
 
   const calendarDays = useMemo(() => {
     const start = startOfMonth(selectedDate);
@@ -160,7 +269,7 @@ export default function MonthlyViewScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={theme.colors.accent} />
-        <Text style={styles.loadingText}>Ładowanie pracowników...</Text>
+        <Text style={styles.loadingText}>{t('Ladowanie pracownikow...')}</Text>
       </View>
     );
   }
@@ -173,7 +282,7 @@ export default function MonthlyViewScreen() {
 
         {/* 2. Card "Pracownik" */}
         <Card style={styles.cardSpacing}>
-          <SectionTitle text="PRACOWNIK" />
+          <SectionTitle text={t('PRACOWNIK')} />
 
           {selectedEmployee ? (
             <View style={styles.employeeSection}>
@@ -188,7 +297,7 @@ export default function MonthlyViewScreen() {
 
               <StatusBadge
                 status="work"
-                label={selectedEmployee.active ? 'Aktywny' : 'Nieaktywny'}
+                label={selectedEmployee.active ? t('Aktywny') : t('Nieaktywny')}
               />
             </View>
           ) : null}
@@ -204,7 +313,7 @@ export default function MonthlyViewScreen() {
               color={theme.colors.accent}
             />
             <Text style={styles.pillButtonText}>
-              {selectedEmployee ? 'Zmień pracownika' : 'Wybierz pracownika'}
+              {selectedEmployee ? t('Zmien pracownika') : t('Wybierz pracownika')}
             </Text>
           </TouchableOpacity>
         </Card>
@@ -224,7 +333,7 @@ export default function MonthlyViewScreen() {
                 </TouchableOpacity>
 
                 <Text style={styles.monthTitle}>
-                  {format(selectedDate, 'LLLL yyyy', { locale: pl })}
+                  {format(selectedDate, 'LLLL yyyy', { locale })}
                 </Text>
 
                 <TouchableOpacity onPress={handleNextMonth} style={styles.navArrow}>
@@ -252,7 +361,7 @@ export default function MonthlyViewScreen() {
                       viewMode === 'calendar' && styles.toggleTextActive,
                     ]}
                   >
-                    Kalendarz
+                    {t('Kalendarz')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -269,7 +378,7 @@ export default function MonthlyViewScreen() {
                       viewMode === 'summary' && styles.toggleTextActive,
                     ]}
                   >
-                    Podsumowanie
+                    {t('Podsumowanie')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -279,33 +388,33 @@ export default function MonthlyViewScreen() {
               <Card style={styles.cardSpacing}>
                 <View style={styles.centeredContent}>
                   <ActivityIndicator size="large" color={theme.colors.accent} />
-                  <Text style={styles.loadingText}>Ładowanie danych...</Text>
+                  <Text style={styles.loadingText}>{t('Ladowanie danych...')}</Text>
                 </View>
               </Card>
             ) : (
               <>
                 {/* 4. Card "Podsumowanie miesiąca" */}
                 <Card style={styles.cardSpacing}>
-                  <SectionTitle text="PODSUMOWANIE MIESIĄCA" />
+                  <SectionTitle text={t('PODSUMOWANIE MIESIACA')} />
 
                   {/* Rząd 3 StatBoxów */}
                   <View style={styles.statsRow}>
                     <View style={styles.statBoxWrapper}>
                       <StatBox
                         value={formatHours(monthlyStats.totalHours, true)}
-                        label="Łącznie godzin"
+                          label={t('Lacznie godzin')}
                       />
                     </View>
                     <View style={styles.statBoxWrapper}>
                       <StatBox
                         value={String(monthlyStats.daysWithEntries)}
-                        label="Dni z wpisami"
+                          label={t('Dni z wpisami')}
                       />
                     </View>
                     <View style={styles.statBoxWrapper}>
                       <StatBox
                         value={formatHours(monthlyStats.averagePerDay, true)}
-                        label="Średnia/dzień"
+                          label={t('Srednia/dzien')}
                       />
                     </View>
                   </View>
@@ -345,11 +454,11 @@ export default function MonthlyViewScreen() {
                 {/* Kalendarz lub szczegółowy widok */}
                 {viewMode === 'calendar' ? (
                   <Card style={styles.cardSpacing}>
-                    <SectionTitle text="KALENDARZ" />
+                    <SectionTitle text={t('KALENDARZ')} />
 
                     {/* Nagłówki dni tygodnia */}
                     <View style={styles.weekDays}>
-                      {['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'].map(day => (
+                      {weekDayLabels.map(day => (
                         <Text key={day} style={styles.weekDay}>
                           {day}
                         </Text>
@@ -365,16 +474,16 @@ export default function MonthlyViewScreen() {
                             styles.dayCell,
                             !day.isCurrentMonth && styles.dayCellOutside,
                             day.totalHours > 0 && styles.dayCellWithEntries,
+                            isSameDay(day.date, today) && styles.dayCellToday,
                           ]}
-                          onPress={() => {
-                            // Można dodać nawigację do szczegółów dnia
-                          }}
+                          onPress={() => openDayEditor(day.date)}
                           activeOpacity={0.7}
                         >
                           <Text
                             style={[
                               styles.dayNumber,
                               !day.isCurrentMonth && styles.dayNumberOutside,
+                              isSameDay(day.date, today) && styles.dayNumberToday,
                             ]}
                           >
                             {format(day.date, 'd')}
@@ -430,11 +539,11 @@ export default function MonthlyViewScreen() {
                   </Card>
                 ) : (
                   <Card style={styles.cardSpacing}>
-                    <SectionTitle text="SZCZEGÓŁOWY WYKAZ" />
+                    <SectionTitle text={t('SZCZEGOLY WYKAZ')} />
 
                     {timeEntries.length === 0 ? (
                       <Text style={styles.emptyText}>
-                        Brak wpisów dla wybranego miesiąca
+                        {t('Brak wpisow dla wybranego miesiaca')}
                       </Text>
                     ) : (
                       <View style={styles.detailedList}>
@@ -472,7 +581,7 @@ export default function MonthlyViewScreen() {
           <Card style={styles.cardSpacing}>
             <View style={styles.centeredContent}>
               <Text style={styles.infoText}>
-                Wybierz pracownika, aby zobaczyć jego miesięczne podsumowanie
+                {t('Wybierz pracownika, aby zobaczyc jego miesieczne podsumowanie')}
               </Text>
             </View>
           </Card>
@@ -489,7 +598,7 @@ export default function MonthlyViewScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Wybierz pracownika</Text>
+              <Text style={styles.modalTitle}>{t('Wybierz pracownika')}</Text>
               <TouchableOpacity onPress={() => setShowEmployeeModal(false)}>
                 <MaterialCommunityIcons
                   name="close"
@@ -522,8 +631,100 @@ export default function MonthlyViewScreen() {
               onPress={() => setShowEmployeeModal(false)}
               activeOpacity={0.7}
             >
-              <Text style={styles.modalCloseText}>Zamknij</Text>
+              <Text style={styles.modalCloseText}>{t('Zamknij')}</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {toastVisible && (
+        <View pointerEvents="none" style={styles.toastWrap}>
+          <View style={styles.toast}>
+            <Text style={styles.toastText}>{toastMessage}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Modal edycji dnia */}
+      <Modal
+        visible={isEditOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closeDayEditor}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.editModal}>
+            <Text style={styles.editTitle}>{t('Edycja dnia')}</Text>
+            <Text style={styles.editSubtitle}>
+              {editDay ? format(editDay, 'dd.MM.yyyy', { locale }) : ''}
+            </Text>
+
+            <View style={styles.editSection}>
+              <Text style={styles.editLabel}>{t('Status')}</Text>
+              <View style={styles.statusChipRow}>
+                {statusOptions.map(option => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.statusChip,
+                      editStatus === option.value && styles.statusChipActive,
+                    ]}
+                    onPress={() => {
+                      setEditStatus(option.value);
+                      setEditError('');
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.statusChipText,
+                        editStatus === option.value && styles.statusChipTextActive,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {editStatus === 'work' && (
+              <View style={styles.editSection}>
+                <Text style={styles.editLabel}>{t('Godziny')}</Text>
+                <TextInput
+                  style={styles.hoursInput}
+                  value={editHours}
+                  onChangeText={(value) => {
+                    setEditHours(value);
+                    if (editError) {
+                      setEditError('');
+                    }
+                  }}
+                  keyboardType="numeric"
+                  placeholder={t('np. 8')}
+                />
+              </View>
+            )}
+
+            {!!editError && <Text style={styles.editErrorText}>{editError}</Text>}
+
+            <View style={styles.editButtons}>
+              <TouchableOpacity style={styles.btnSecondary} onPress={closeDayEditor}>
+                <Text style={styles.btnSecondaryText}>{t('Anuluj')}</Text>
+              </TouchableOpacity>
+              {editEntryId && (
+                <TouchableOpacity style={styles.btnDanger} onPress={handleDeleteDay}>
+                  <Text style={styles.btnDangerText}>{t('Usun')}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.btnPrimary}
+                onPress={handleSaveDay}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.btnPrimaryText}>{t('Zapisz')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -709,8 +910,13 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   dayCellWithEntries: {
-    backgroundColor: theme.colors.accentLight,
+    backgroundColor: theme.colors.statusColors.work.bg,
+    borderColor: theme.colors.statusColors.work.text,
+  },
+  dayCellToday: {
+    borderWidth: 2,
     borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.accentLight,
   },
   dayNumber: {
     fontSize: theme.fontSize.md,
@@ -719,6 +925,10 @@ const styles = StyleSheet.create({
   },
   dayNumberOutside: {
     color: theme.colors.muted,
+  },
+  dayNumberToday: {
+    color: theme.colors.accent,
+    fontWeight: '700',
   },
   dayEntries: {
     alignItems: 'center',
@@ -839,6 +1049,130 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     color: theme.colors.muted,
     marginTop: 2,
+  },
+  editModal: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.lg,
+    margin: theme.spacing.lg,
+  },
+  editTitle: {
+    fontSize: theme.fontSize.xl,
+    fontWeight: '700',
+    color: theme.colors.dark,
+  },
+  editSubtitle: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.muted,
+    marginTop: 4,
+  },
+  editSection: {
+    marginTop: theme.spacing.lg,
+  },
+  editLabel: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.muted,
+    marginBottom: theme.spacing.xs,
+  },
+  statusChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  statusChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  statusChipActive: {
+    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.accentLight,
+  },
+  statusChipText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.dark,
+    fontWeight: '600',
+  },
+  statusChipTextActive: {
+    color: theme.colors.accent,
+  },
+  hoursInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    fontSize: theme.fontSize.md,
+    color: theme.colors.dark,
+    backgroundColor: theme.colors.background,
+  },
+  editErrorText: {
+    marginTop: theme.spacing.sm,
+    color: theme.colors.error,
+    fontSize: theme.fontSize.sm,
+    fontWeight: '600',
+  },
+  editButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.lg,
+  },
+  btnSecondary: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+  },
+  btnSecondaryText: {
+    color: theme.colors.dark,
+    fontWeight: '600',
+  },
+  btnPrimary: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.accent,
+    alignItems: 'center',
+  },
+  btnPrimaryText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  btnDanger: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.errorLight,
+    borderWidth: 1,
+    borderColor: theme.colors.error,
+    alignItems: 'center',
+  },
+  btnDangerText: {
+    color: theme.colors.error,
+    fontWeight: '700',
+  },
+  toastWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: theme.spacing.xl,
+    alignItems: 'center',
+  },
+  toast: {
+    backgroundColor: theme.colors.dark,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.pill,
+  },
+  toastText: {
+    color: '#FFFFFF',
+    fontSize: theme.fontSize.sm,
+    fontWeight: '600',
   },
   modalCloseButton: {
     marginTop: theme.spacing.lg,

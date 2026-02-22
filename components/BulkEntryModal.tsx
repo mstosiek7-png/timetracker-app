@@ -8,14 +8,20 @@ import {
   TouchableOpacity, StyleSheet, Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { format } from 'date-fns';
 import { Checkbox, PrimaryButton, OutlineButton } from './ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius } from '../theme';
 import { useWorkers } from '../hooks/useWorkers';
 import { useCreateBulkTimeEntries } from '../hooks/useTimeEntries';
+import { useI18n } from '../i18n/I18nProvider';
 
-interface Props { visible: boolean; onClose: () => void; }
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  onSaved?: (count: number) => void;
+}
 
-const STATUSES = ['Praca', 'Chorobowe', 'Urlop', 'FZA'];
+const STATUS_KEYS = ['Praca', 'Chorobowe', 'Urlop', 'FZA'];
 
 interface WorkerRow {
   id: string;
@@ -26,9 +32,10 @@ interface WorkerRow {
   status: string;
 }
 
-export function BulkEntryModal({ visible, onClose }: Props) {
+export function BulkEntryModal({ visible, onClose, onSaved }: Props) {
   const { workers } = useWorkers();
   const createBulkEntries = useCreateBulkTimeEntries();
+  const { t, language } = useI18n();
 
   const [defaultStartTime, setDefaultStartTime] = useState(new Date(new Date().setHours(8, 0, 0, 0)));
   const [defaultEndTime, setDefaultEndTime] = useState(new Date(new Date().setHours(16, 0, 0, 0)));
@@ -72,7 +79,7 @@ export function BulkEntryModal({ visible, onClose }: Props) {
     d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   
   const formatTime = (d: Date) =>
-    d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+    d.toLocaleTimeString(language === 'de' ? 'de-DE' : 'pl-PL', { hour: '2-digit', minute: '2-digit' });
 
   const STATUS_DB: Record<string, string> = { 'Praca': 'work', 'Chorobowe': 'sick', 'Urlop': 'vacation', 'FZA': 'fza' };
 
@@ -85,13 +92,14 @@ export function BulkEntryModal({ visible, onClose }: Props) {
         const hoursVal = statusVal === 'work' ? parseFloat(r.hours) || 0 : 0;
         return {
           employee_id: r.id,
-          date: date.toISOString().split('T')[0],
+          date: format(date, 'yyyy-MM-dd'),
           hours: hoursVal,
           status: statusVal as any,
           notes: null,
         };
       });
     await createBulkEntries.mutateAsync(entries);
+    onSaved?.(entries.length);
     onClose();
   }
 
@@ -103,26 +111,26 @@ export function BulkEntryModal({ visible, onClose }: Props) {
           {/* ─── Colored header ────────────────────────── */}
           <View style={styles.colorHeader}>
             <View style={styles.handle} />
-            <Text style={styles.headerTitle}>Zbiorcze wprowadzanie godzin</Text>
-            <Text style={styles.headerDate}>Data: {formatDate(date)}</Text>
+            <Text style={styles.headerTitle}>{t('Zbiorcze wprowadzanie godzin')}</Text>
+            <Text style={styles.headerDate}>{t('Data')}: {formatDate(date)}</Text>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* ─── Default settings ──────────────────── */}
-            <Text style={styles.sectionTitle}>Ustawienia domyślne</Text>
+            <Text style={styles.sectionTitle}>{t('Ustawienia domyslne')}</Text>
             
             <View style={styles.defaultsRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Domyślny status</Text>
+                <Text style={styles.label}>{t('Domyslny status')}</Text>
                 <View style={styles.defaultStatusGroup}>
-                  {STATUSES.map(s => (
+                  {STATUS_KEYS.map(s => (
                     <TouchableOpacity
                       key={s}
                       style={[styles.defaultStatusChip, defaultStatus === s && styles.defaultStatusChipSelected]}
                       onPress={() => setDefaultStatus(s)}
                     >
                       {defaultStatus === s && <Text style={styles.checkMark}>✓ </Text>}
-                      <Text style={[styles.defaultStatusText, defaultStatus === s && styles.defaultStatusTextSelected]}>{s}</Text>
+                      <Text style={[styles.defaultStatusText, defaultStatus === s && styles.defaultStatusTextSelected]}>{t(s)}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -133,7 +141,7 @@ export function BulkEntryModal({ visible, onClose }: Props) {
             {defaultStatus === 'Praca' && (
               <View style={styles.defaultsRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Godziny pracy *</Text>
+                  <Text style={styles.label}>{t('Godziny pracy')} *</Text>
                   <View style={styles.timeRow}>
                     <TouchableOpacity style={styles.timeBtn} onPress={() => setShowStartPicker(true)}>
                       <Text style={styles.timeBtnIcon}>🕐</Text>
@@ -158,12 +166,12 @@ export function BulkEntryModal({ visible, onClose }: Props) {
               </View>
             )}
             <TouchableOpacity style={styles.applyBtn} onPress={applyToAll}>
-              <Text style={styles.applyBtnText}>↓ Zastosuj do wszystkich</Text>
+              <Text style={styles.applyBtnText}>↓ {t('Zastosuj do wszystkich')}</Text>
             </TouchableOpacity>
 
             {/* ─── Date ──────────────────────────────── */}
             <View style={styles.section}>
-              <Text style={styles.label}>Data</Text>
+              <Text style={styles.label}>{t('Data')}</Text>
               <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
                 <Text>📅 </Text>
                 <Text style={styles.dateBtnText}>{formatDate(date)}</Text>
@@ -177,24 +185,24 @@ export function BulkEntryModal({ visible, onClose }: Props) {
             {/* ─── Workers table ─────────────────────── */}
             <View style={styles.section}>
               <View style={styles.tableHeaderRow}>
-                <Text style={styles.tableSection}>Pracownicy</Text>
+                <Text style={styles.tableSection}>{t('Pracownicy')}</Text>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                   <TouchableOpacity onPress={() => toggleAll(true)}>
-                    <Text style={styles.selectAll}>Zaznacz wszystkich</Text>
+                    <Text style={styles.selectAll}>{t('Zaznacz wszystkich')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => toggleAll(false)}>
-                    <Text style={styles.deselectAll}>Odznacz wszystkich</Text>
+                    <Text style={styles.deselectAll}>{t('Odznacz wszystkich')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={styles.countLabel}>Wybrano: {selectedCount} z {rows.length} pracowników</Text>
+              <Text style={styles.countLabel}>{t('Wybrano')}: {selectedCount} {t('z')} {rows.length} {t('pracownikow')}</Text>
 
               {/* Table head */}
               <View style={styles.tableHead}>
-                <Text style={[styles.th, { width: 40 }]}>Wybór</Text>
-                <Text style={[styles.th, { flex: 1 }]}>Pracownik</Text>
-                {defaultStatus === 'Praca' && <Text style={[styles.th, { width: 70 }]}>Godz.</Text>}
-                <Text style={[styles.th, { width: 90 }]}>Status</Text>
+                <Text style={[styles.th, { width: 40 }]}>{t('Wybor')}</Text>
+                <Text style={[styles.th, { flex: 1 }]}>{t('Pracownik')}</Text>
+                {defaultStatus === 'Praca' && <Text style={[styles.th, { width: 70 }]}>{t('Godz.')}</Text>}
+                <Text style={[styles.th, { width: 90 }]}>{t('Status')}</Text>
               </View>
 
               {rows.map(row => (
@@ -223,14 +231,14 @@ export function BulkEntryModal({ visible, onClose }: Props) {
                   )}
                   {/* Status mini-chips */}
                   <View style={{ width: 90 }}>
-                    {STATUSES.map(s => (
+                    {STATUS_KEYS.map(s => (
                       <TouchableOpacity
                         key={s}
                         style={[styles.miniChip, row.status === s && styles.miniChipSelected]}
                         onPress={() => row.checked && updateRow(row.id, { status: s })}
                       >
                         <Text style={[styles.miniChipText, row.status === s && styles.miniChipTextSelected]}>
-                          {row.status === s ? '✓ ' : ''}{s.slice(0, 3)}
+                          {row.status === s ? '✓ ' : ''}{t(s).slice(0, 3)}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -244,9 +252,9 @@ export function BulkEntryModal({ visible, onClose }: Props) {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <OutlineButton label="Anuluj" onPress={onClose} style={{ flex: 1, minHeight: 52 }} />
+            <OutlineButton label={t('Anuluj')} onPress={onClose} style={{ flex: 1, minHeight: 52 }} />
             <PrimaryButton
-              label={`✓ Zapisz (${selectedCount})`}
+              label={`✓ ${t('Zapisz')} (${selectedCount})`}
               onPress={handleSave}
               disabled={selectedCount === 0}
               style={{ flex: 1, minHeight: 52 }}

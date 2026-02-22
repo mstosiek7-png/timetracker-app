@@ -16,6 +16,7 @@ import {
 import { useEmployees, useDeleteEmployee } from '../../hooks/useEmployees';
 import { Employee } from '../../types/models';
 import { EmployeeForm } from './EmployeeForm';
+import { useI18n } from '../../i18n/I18nProvider';
 
 interface EmployeeListProps {
   onEmployeePress?: (employee: Employee) => void;
@@ -28,6 +29,7 @@ export function EmployeeList({
   showActions = true,
   filterActive,
 }: EmployeeListProps) {
+  const { t } = useI18n();
   const { data: employees, isLoading, error, refetch } = useEmployees({
     active: filterActive,
   });
@@ -46,24 +48,24 @@ export function EmployeeList({
 
   const handleDeleteEmployee = (employee: Employee) => {
     Alert.alert(
-      'Usuń pracownika',
-      `Czy na pewno chcesz usunąć pracownika "${employee.name}"?`,
+      t('Usun pracownika'),
+      `${t('Czy na pewno usunac pracownika')} "${employee.name}"?`,
       [
         {
-          text: 'Anuluj',
+          text: t('Anuluj'),
           style: 'cancel',
         },
         {
-          text: 'Usuń',
+          text: t('Usun'),
           style: 'destructive',
           onPress: async () => {
             try {
               await deleteMutation.mutateAsync(employee.id);
-              Alert.alert('Sukces', 'Pracownik został usunięty');
+              Alert.alert(t('Sukces'), t('Pracownik zostal usuniety'));
             } catch (error) {
               Alert.alert(
-                'Błąd',
-                error instanceof Error ? error.message : 'Wystąpił błąd podczas usuwania'
+                t('Blad'),
+                error instanceof Error ? error.message : t('Wystapil blad podczas usuwania')
               );
             }
           },
@@ -80,7 +82,7 @@ export function EmployeeList({
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#3b82f6" />
-        <Text style={styles.loadingText}>Ładowanie pracowników...</Text>
+        <Text style={styles.loadingText}>{t('Ladowanie pracownikow...')}</Text>
       </View>
     );
   }
@@ -88,9 +90,9 @@ export function EmployeeList({
   if (error) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorText}>Błąd: {error.message}</Text>
+        <Text style={styles.errorText}>{t('Blad')}: {error.message}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
-          <Text style={styles.retryButtonText}>Spróbuj ponownie</Text>
+          <Text style={styles.retryButtonText}>{t('Sprobuj ponownie')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -99,12 +101,12 @@ export function EmployeeList({
   if (!employees || employees.length === 0) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.emptyText}>Brak pracowników</Text>
+        <Text style={styles.emptyText}>{t('Brak pracownikow')}</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => setShowAddModal(true)}
         >
-          <Text style={styles.addButtonText}>Dodaj pierwszego pracownika</Text>
+          <Text style={styles.addButtonText}>{t('Dodaj pierwszego pracownika')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -145,7 +147,7 @@ export function EmployeeList({
                         : styles.statusTextInactive,
                     ]}
                   >
-                    {employee.active ? 'Aktywny' : 'Nieaktywny'}
+                    {employee.active ? t('Aktywny') : t('Nieaktywny')}
                   </Text>
                 </View>
               </View>
@@ -157,7 +159,7 @@ export function EmployeeList({
                   style={[styles.actionButton, styles.editButton]}
                   onPress={() => handleEditEmployee(employee)}
                 >
-                  <Text style={styles.editButtonText}>Edytuj</Text>
+                  <Text style={styles.editButtonText}>{t('Edytuj')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -168,7 +170,7 @@ export function EmployeeList({
                   {deleteMutation.isPending ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Text style={styles.deleteButtonText}>Usuń</Text>
+                    <Text style={styles.deleteButtonText}>{t('Usun')}</Text>
                   )}
                 </TouchableOpacity>
               </View>

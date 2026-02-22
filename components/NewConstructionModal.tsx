@@ -9,6 +9,7 @@ import {
 import { PrimaryButton, OutlineButton } from './ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../theme';
 import { useBaustellen } from '../hooks/useBaustellen';
+import { useI18n } from '../i18n/I18nProvider';
 
 interface Props {
   visible: boolean;
@@ -20,6 +21,7 @@ const DEFAULT_TYPES = ['AC 11 D S'];
 
 export default function NewConstructionModal({ visible, onClose, siteDate }: Props) {
   const { createSite } = useBaustellen();
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [asphaltTypes, setAsphaltTypes] = useState<string[]>(DEFAULT_TYPES);
@@ -49,7 +51,7 @@ export default function NewConstructionModal({ visible, onClose, siteDate }: Pro
 
   function removeType(i: number) {
     if (asphaltTypes.length <= 1) {
-      Alert.alert('Uwaga', 'Musi byÄ‡ przynajmniej jedna klasa asfaltu');
+      Alert.alert(t('Uwaga'), t('Musi byc przynajmniej jedna klasa asfaltu'));
       return;
     }
     setAsphaltTypes(prev => prev.filter((_, idx) => idx !== i));
@@ -57,7 +59,7 @@ export default function NewConstructionModal({ visible, onClose, siteDate }: Pro
 
   async function handleSave() {
     if (!name.trim()) {
-      Alert.alert('BĹ‚Ä…d', 'Podaj nazwÄ™ budowy');
+      Alert.alert(t('Blad'), t('Podaj nazwe budowy'));
       return;
     }
     setSaving(true);
@@ -67,10 +69,10 @@ export default function NewConstructionModal({ visible, onClose, siteDate }: Pro
         address: address.trim() || undefined,
         siteDate,
       });
-      Alert.alert('Sukces', 'Budowa zostaĹ‚a dodana');
+      Alert.alert(t('Sukces'), t('Budowa zostala dodana'));
       handleClose();
     } catch (e: any) {
-      Alert.alert('BĹ‚Ä…d', e.message ?? 'Nie udaĹ‚o siÄ™ dodaÄ‡ budowy');
+      Alert.alert(t('Blad'), e.message ?? t('Nie udalo sie dodac budowy'));
       setSaving(false);
     }
   }
@@ -81,7 +83,7 @@ export default function NewConstructionModal({ visible, onClose, siteDate }: Pro
         <View style={styles.sheet}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Nowa budowa</Text>
+            <Text style={styles.title}>{t('Nowa budowa')}</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
               <Text style={styles.closeX}>âś•</Text>
             </TouchableOpacity>
@@ -89,27 +91,27 @@ export default function NewConstructionModal({ visible, onClose, siteDate }: Pro
 
           <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
             {/* Name */}
-            <Text style={styles.label}>Nazwa budowy *</Text>
+            <Text style={styles.label}>{t('Nazwa budowy')} *</Text>
             <TextInput
               style={styles.input}
               value={name}
               onChangeText={setName}
-              placeholder="np. A40 Sanierung Abschnitt 3"
+              placeholder={t('np. A40 Sanierung Abschnitt 3')}
               placeholderTextColor={Colors.grayLight}
             />
 
             {/* Address */}
-            <Text style={[styles.label, { marginTop: Spacing.lg }]}>Adres</Text>
+            <Text style={[styles.label, { marginTop: Spacing.lg }]}>{t('Adres')}</Text>
             <TextInput
               style={styles.input}
               value={address}
               onChangeText={setAddress}
-              placeholder="np. A40, 45127 Essen"
+              placeholder={t('np. A40, 45127 Essen')}
               placeholderTextColor={Colors.grayLight}
             />
 
             {/* Asphalt types */}
-            <Text style={[styles.label, { marginTop: Spacing.lg }]}>Klasy asfaltu</Text>
+            <Text style={[styles.label, { marginTop: Spacing.lg }]}>{t('Klasy asfaltu')}</Text>
             {asphaltTypes.map((t, i) => (
               <View key={i} style={styles.typeRow}>
                 <Text style={styles.typeText}>{t}</Text>
@@ -123,7 +125,7 @@ export default function NewConstructionModal({ visible, onClose, siteDate }: Pro
                 style={[styles.input, { flex: 1, marginBottom: 0 }]}
                 value={newType}
                 onChangeText={setNewType}
-                placeholder="np. SMA 11 S"
+                placeholder={t('np. SMA 11 S')}
                 placeholderTextColor={Colors.grayLight}
                 onSubmitEditing={addType}
                 returnKeyType="done"
@@ -140,8 +142,8 @@ export default function NewConstructionModal({ visible, onClose, siteDate }: Pro
 
           {/* Footer */}
           <View style={styles.footer}>
-            <OutlineButton label="Anuluj" onPress={handleClose} style={{ flex: 1 }} />
-            <PrimaryButton label="Zapisz" onPress={handleSave} loading={saving} style={{ flex: 1 }} />
+            <OutlineButton label={t('Anuluj')} onPress={handleClose} style={{ flex: 1 }} />
+            <PrimaryButton label={t('Zapisz')} onPress={handleSave} loading={saving} style={{ flex: 1 }} />
           </View>
         </View>
       </KeyboardAvoidingView>

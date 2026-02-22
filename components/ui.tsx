@@ -1,24 +1,29 @@
 // ============================================================
 // TimeTracker — Shared UI Components
 // ============================================================
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet, Modal,
   ActivityIndicator, ViewStyle, TextStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius, Spacing, FontFamily, FontSize, Shadows } from '../theme';
+import { useI18n } from '../i18n/I18nProvider';
 
 // ─── AppHeader ───────────────────────────────────────────────
 interface AppHeaderProps {
   title: string;
   subtitle?: string;
   rightElement?: React.ReactNode;
+  rightElementTop?: React.ReactNode;
   showBack?: boolean;
   onBack?: () => void;
 }
-export function AppHeader({ title, subtitle, rightElement, showBack, onBack }: AppHeaderProps) {
+export function AppHeader({ title, subtitle, rightElement, rightElementTop, showBack, onBack }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
+  const { language, setLanguage, t } = useI18n();
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const langBadge = language === 'pl' ? 'PL' : 'DE';
   return (
     <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
       <View style={styles.headerLeft}>
@@ -34,7 +39,55 @@ export function AppHeader({ title, subtitle, rightElement, showBack, onBack }: A
           <Text style={styles.headerTitle}>{title}</Text>
         </View>
       </View>
-      {rightElement && <View style={styles.headerRight}>{rightElement}</View>}
+      <View style={styles.headerRight}>
+        {rightElementTop ? <View style={styles.headerRightTop}>{rightElementTop}</View> : null}
+        <View style={styles.headerRightBottom}>
+          {rightElement}
+          <TouchableOpacity
+            style={styles.langButton}
+            onPress={() => setShowLanguageModal(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.langButtonText}>{langBadge}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <Modal
+        visible={showLanguageModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLanguageModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.langModalOverlay}
+          onPress={() => setShowLanguageModal(false)}
+          activeOpacity={1}
+        />
+        <View style={styles.langModalSheet}>
+          <Text style={styles.langModalTitle}>{t('languageTitle')}</Text>
+          <TouchableOpacity
+            style={styles.langOption}
+            onPress={() => {
+              setLanguage('pl');
+              setShowLanguageModal(false);
+            }}
+          >
+            <Text style={styles.langOptionText}>{t('languagePolish')}</Text>
+            {language === 'pl' && <Text style={styles.langOptionCheck}>✓</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.langOption}
+            onPress={() => {
+              setLanguage('de');
+              setShowLanguageModal(false);
+            }}
+          >
+            <Text style={styles.langOptionText}>{t('languageGerman')}</Text>
+            {language === 'de' && <Text style={styles.langOptionCheck}>✓</Text>}
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -130,17 +183,20 @@ export function GhostButton({ label, onPress, style }: ButtonProps) {
 }
 
 // ─── Badge ───────────────────────────────────────────────────
-type BadgeVariant = 'praca' | 'chorobowe' | 'urlop' | 'fza' | 'active';
+type BadgeVariant = 'praca' | 'chorobowe' | 'urlop' | 'fza' | 'active' | 'work' | 'sick' | 'vacation';
 interface BadgeProps { label: string; variant: BadgeVariant; }
 export function Badge({ label, variant }: BadgeProps) {
   const variantStyles: Record<BadgeVariant, { bg: string; text: string }> = {
     praca:      { bg: Colors.greenBg,  text: Colors.green },
+    work:       { bg: Colors.greenBg,  text: Colors.green },
     chorobowe:  { bg: Colors.redBg,    text: Colors.red },
+    sick:       { bg: Colors.redBg,    text: Colors.red },
     urlop:      { bg: Colors.blueBg,   text: Colors.blue },
+    vacation:   { bg: Colors.blueBg,   text: Colors.blue },
     fza:        { bg: Colors.fzaBg,    text: Colors.fzaText },
     active:     { bg: Colors.orangePale, text: Colors.orange },
   };
-  const vs = variantStyles[variant];
+  const vs = variantStyles[variant] ?? { bg: Colors.creamDark, text: Colors.grayDark };
   return (
     <View style={[styles.badge, { backgroundColor: vs.bg }]}>
       <Text style={[styles.badgeText, { color: vs.text }]}>{label}</Text>
@@ -228,16 +284,16 @@ interface BottomNavProps {
   onFabPress?: () => void;
   fabOpen?: boolean;
 }
-const NAV_ITEMS_LEFT: NavItem[] = [
-  { icon: '⊞', label: 'Dashboard',  screen: 'Dashboard' },
-  { icon: '🔧', label: 'Baustellen', screen: 'Baustellen' },
-];
-const NAV_ITEMS_RIGHT: NavItem[] = [
-  { icon: '🔢', label: 'Kalkulator', screen: 'Calculator' },
-  { icon: '📊', label: 'Raporty',    screen: 'Reports' },
-];
-
 export function BottomNav({ active, onNavigate, onFabPress, fabOpen }: BottomNavProps) {
+  const { t } = useI18n();
+  const NAV_ITEMS_LEFT: NavItem[] = [
+    { icon: '⊞', label: t('Dashboard'),  screen: 'Dashboard' },
+    { icon: '🔧', label: t('Baustellen'), screen: 'Baustellen' },
+  ];
+  const NAV_ITEMS_RIGHT: NavItem[] = [
+    { icon: '🔢', label: t('Kalkulator'), screen: 'Calculator' },
+    { icon: '📊', label: t('Raporty'),    screen: 'Reports' },
+  ];
   return (
     <View style={styles.bottomNavContainer}>
       <View style={styles.bottomNav}>
@@ -292,7 +348,49 @@ const styles = StyleSheet.create({
     // paddingTop is set dynamically via useSafeAreaInsets
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  headerRight: {},
+  headerRight: { alignItems: 'flex-end', gap: 8 },
+  headerRightTop: { alignItems: 'flex-end' },
+  headerRightBottom: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  langButton: {
+    minWidth: 38,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  langButtonText: { color: '#fff', fontFamily: FontFamily.bold, fontSize: 12 },
+  langModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  langModalSheet: {
+    position: 'absolute',
+    top: 90,
+    right: 16,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    minWidth: 180,
+    ...Shadows.md,
+  },
+  langModalTitle: {
+    fontSize: 12,
+    fontFamily: FontFamily.bold,
+    color: Colors.grayMid,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: Spacing.sm,
+  },
+  langOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  langOptionText: { fontSize: 14, fontFamily: FontFamily.semiBold, color: Colors.black },
+  langOptionCheck: { fontSize: 14, color: Colors.orange, fontFamily: FontFamily.bold },
   headerTitle: { fontSize: 24, fontFamily: FontFamily.bold, color: '#fff', letterSpacing: -0.3 },
   headerSub: { fontSize: 11, fontFamily: FontFamily.bold, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 },
   backBtn: {

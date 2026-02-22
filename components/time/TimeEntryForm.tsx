@@ -19,11 +19,12 @@ import {
 } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
-import { pl } from 'date-fns/locale';
+import { de, pl } from 'date-fns/locale';
 
 import { TimeEntry, TimeEntryInsert, TimeEntryStatus } from '../../types/models';
 import { useEmployees } from '../../hooks/useEmployees';
 import { formatHours } from '../../utils/formatting';
+import { useI18n } from '../../i18n/I18nProvider';
 
 // =====================================================
 // Types
@@ -60,6 +61,8 @@ export default function TimeEntryForm({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const { t, language } = useI18n();
+  const locale = language === 'de' ? de : pl;
 
   // Hooks
   const { data: employees = [], isLoading: isLoadingEmployees } = useEmployees();
@@ -141,12 +144,24 @@ export default function TimeEntryForm({
 
   const isFormValid = employeeId && date && isTimeValid;
 
+  const submitLabel = t(submitButtonText);
+
+  const getStatusLabel = (statusValue: TimeEntryStatus): string => {
+    const labels: Record<TimeEntryStatus, string> = {
+      work: t('Praca'),
+      sick: t('Chorobowe'),
+      vacation: t('Urlop'),
+      fza: t('FZA'),
+    };
+    return labels[statusValue];
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.form}>
         {/* Wybór pracownika */}
         <View style={styles.section}>
-          <Text style={styles.label}>Pracownik *</Text>
+          <Text style={styles.label}>{t('Pracownik')} *</Text>
           {isLoadingEmployees ? (
             <ActivityIndicator style={styles.loading} />
           ) : (
@@ -166,7 +181,7 @@ export default function TimeEntryForm({
             </View>
           )}
           <HelperText type="error" visible={!employeeId}>
-            Wybierz pracownika
+            {t('Wybierz pracownika')}
           </HelperText>
         </View>
 
@@ -174,14 +189,14 @@ export default function TimeEntryForm({
 
         {/* Data */}
         <View style={styles.section}>
-          <Text style={styles.label}>Data *</Text>
+          <Text style={styles.label}>{t('Data')} *</Text>
           <Button
             mode="outlined"
             onPress={() => setShowDatePicker(true)}
             style={styles.dateButton}
             icon="calendar"
           >
-            {format(date, 'dd.MM.yyyy', { locale: pl })}
+            {format(date, 'dd.MM.yyyy', { locale })}
           </Button>
           {showDatePicker && (
             <DateTimePicker
@@ -198,7 +213,7 @@ export default function TimeEntryForm({
 
         {/* Status */}
         <View style={styles.section}>
-          <Text style={styles.label}>Status *</Text>
+          <Text style={styles.label}>{t('Status')} *</Text>
           <View style={styles.radioGroup}>
             {(['work', 'sick', 'vacation', 'fza'] as TimeEntryStatus[]).map(stat => (
               <View key={stat} style={styles.radioRow}>
@@ -219,10 +234,10 @@ export default function TimeEntryForm({
         {status === 'work' && (
           <>
             <View style={styles.section}>
-              <Text style={styles.label}>Godziny pracy *</Text>
+              <Text style={styles.label}>{t('Godziny pracy')} *</Text>
               <View style={styles.timeRangeContainer}>
                 <View style={styles.timeInputWrapper}>
-                  <Text style={styles.timeLabel}>Od</Text>
+                  <Text style={styles.timeLabel}>{t('Od')}</Text>
                   <Button
                     mode="outlined"
                     onPress={() => setShowStartTimePicker(true)}
@@ -242,7 +257,7 @@ export default function TimeEntryForm({
                 </View>
 
                 <View style={styles.timeInputWrapper}>
-                  <Text style={styles.timeLabel}>Do</Text>
+                  <Text style={styles.timeLabel}>{t('Do')}</Text>
                   <Button
                     mode="outlined"
                     onPress={() => setShowEndTimePicker(true)}
@@ -262,17 +277,17 @@ export default function TimeEntryForm({
                 </View>
 
                 <View style={styles.timeResultWrapper}>
-                  <Text style={styles.timeLabel}>Razem</Text>
+                  <Text style={styles.timeLabel}>{t('Razem')}</Text>
                   <Text style={styles.hoursResult}>{formatHours(calculateHours(), true)}</Text>
                 </View>
               </View>
               {startTime >= endTime && (
                 <HelperText type="error">
-                  Godzina końcowa musi być późniejsza niż początkowa
+                  {t('Godzina koncowa musi byc pozniejsza niz poczatkowa')}
                 </HelperText>
               )}
               <HelperText type="info">
-                Godziny obliczane są automatycznie
+                {t('Godziny obliczane sa automatycznie')}
               </HelperText>
             </View>
 
@@ -282,18 +297,18 @@ export default function TimeEntryForm({
 
         {/* Notatki */}
         <View style={styles.section}>
-          <Text style={styles.label}>Notatki (opcjonalnie)</Text>
+          <Text style={styles.label}>{t('Notatki (opcjonalnie)')}</Text>
           <TextInput
             value={notes}
             onChangeText={setNotes}
-            placeholder="Dodaj notatki do wpisu..."
+            placeholder={t('Dodaj notatki do wpisu...')}
             multiline
             numberOfLines={3}
             style={styles.textArea}
             mode="outlined"
           />
           <HelperText type="info">
-            Notatki mogą zawierać szczegóły dotyczące pracy
+            {t('Notatki moga zawierac szczegoly dotyczace pracy')}
           </HelperText>
         </View>
 
@@ -307,7 +322,7 @@ export default function TimeEntryForm({
             style={styles.cancelButton}
             disabled={isLoading}
           >
-            Anuluj
+            {t('Anuluj')}
           </Button>
           <Button
             mode="contained"
@@ -316,26 +331,12 @@ export default function TimeEntryForm({
             disabled={!isFormValid || isLoading}
             style={styles.submitButton}
           >
-            {submitButtonText}
+            {submitLabel}
           </Button>
         </View>
       </View>
     </ScrollView>
   );
-}
-
-// =====================================================
-// Helper Functions
-// =====================================================
-
-function getStatusLabel(status: TimeEntryStatus): string {
-  const labels = {
-    work: 'Praca',
-    sick: 'Chorobowe',
-    vacation: 'Urlop',
-    fza: 'FZA',
-  };
-  return labels[status];
 }
 
 // =====================================================

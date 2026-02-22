@@ -13,6 +13,7 @@ import { RouteProp } from '@react-navigation/native';
 import { AppHeader, Badge, BottomNav } from '../components/ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../theme';
 import { useBaustellen } from '../hooks/useBaustellen';
+import { useI18n } from '../i18n/I18nProvider';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -24,13 +25,14 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
   const siteId = route.params?.siteId;
   const { getSite, deleteSite } = useBaustellen();
   const site = getSite(siteId);
+  const { t, language } = useI18n();
 
   if (!site) return null;
 
   const handleDelete = () => {
-    Alert.alert('Usuń budowę', `Czy na pewno chcesz usunąć "${site.name}"?`, [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: async () => { 
+    Alert.alert(t('Usun budowe'), `${t('Czy na pewno chcesz usunac')} "${site.name}"?`, [
+      { text: t('Anuluj'), style: 'cancel' },
+      { text: t('Usun'), style: 'destructive', onPress: async () => { 
         setIsDeleting(true);
         try {
           await deleteSite(siteId); 
@@ -38,8 +40,8 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
           navigation.goBack(); 
         } catch (err) {
           setIsDeleting(false);
-          const message = err instanceof Error ? err.message : 'Nieznany błąd';
-          Alert.alert('Błąd usuwania', message);
+          const message = err instanceof Error ? err.message : t('Nieznany blad');
+          Alert.alert(t('Blad usuwania'), message);
         }
       } },
     ]);
@@ -51,11 +53,11 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
       onPress={handleDelete}
       disabled={isDeleting}
     >
-      <Text style={styles.deleteBtnText}>{isDeleting ? '⏳' : '🗑'} Usuń</Text>
+      <Text style={styles.deleteBtnText}>{isDeleting ? '⏳' : '🗑'} {t('Usun')}</Text>
     </TouchableOpacity>
   );
 
-  const todayLabel = new Date().toLocaleDateString('pl-PL', { weekday: 'short', day:'2-digit', month:'2-digit', year:'numeric' });
+  const todayLabel = new Date().toLocaleDateString(language === 'de' ? 'de-DE' : 'pl-PL', { weekday: 'short', day:'2-digit', month:'2-digit', year:'numeric' });
   const todayDeliveries = site.deliveries.filter(d => d.date === new Date().toISOString().split('T')[0]);
 
   return (
@@ -76,9 +78,9 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
         <View style={styles.summaryTable}>
           {/* Header */}
           <View style={styles.tableHead}>
-            <Text style={[styles.th, { flex: 1 }]}>Klasa asfaltu</Text>
-            <Text style={[styles.th, { width: 80, textAlign: 'center' }]}>Dostaw</Text>
-            <Text style={[styles.th, { width: 80, textAlign: 'right' }]}>Tony</Text>
+            <Text style={[styles.th, { flex: 1 }]}>{t('Klasa asfaltu')}</Text>
+            <Text style={[styles.th, { width: 80, textAlign: 'center' }]}>{t('Dostaw')}</Text>
+            <Text style={[styles.th, { width: 80, textAlign: 'right' }]}>{t('Tony')}</Text>
           </View>
           {site.asphaltSummary.map(row => (
             <View key={row.class} style={styles.summaryRow}>
@@ -89,7 +91,7 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
           ))}
           {/* Total */}
           <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { flex: 1 }]}>RAZEM</Text>
+            <Text style={[styles.totalLabel, { flex: 1 }]}>{t('RAZEM')}</Text>
             <Text style={[styles.totalCount, { width: 80, textAlign: 'center' }]}>{site.deliveryCount}×</Text>
             <Text style={[styles.totalTons, { width: 80, textAlign: 'right' }]}>{site.totalTons.toFixed(1)}t</Text>
           </View>
@@ -97,8 +99,8 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
 
         {/* ─── Deliveries today ──────────────────────── */}
         <View style={styles.deliveryHeader}>
-          <Text style={styles.deliveryDateText}>Dostawy — {todayLabel}</Text>
-          <Text style={styles.deliveryCount}>{todayDeliveries.length} dzisiaj</Text>
+          <Text style={styles.deliveryDateText}>{t('Dostawy')} — {todayLabel}</Text>
+          <Text style={styles.deliveryCount}>{todayDeliveries.length} {t('dzisiaj')}</Text>
         </View>
 
         {site.deliveries.map(d => (
@@ -110,7 +112,7 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
             <View style={styles.deliveryInfo}>
               <Text style={styles.deliveryType}>{d.asphaltClass}</Text>
               <Text style={styles.deliveryMeta}>
-                {d.supplier || 'Brak firmy'} · {d.time || '—'} · {d.waybill || '—'}
+                {d.supplier || t('Brak firmy')} · {d.time || '—'} · {d.waybill || '—'}
               </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
@@ -127,7 +129,7 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
           onPress={() => navigation.navigate('NewDelivery', { siteId })}
           activeOpacity={0.9}
         >
-          <Text style={styles.addDeliveryText}>+ Dodaj dostawę</Text>
+          <Text style={styles.addDeliveryText}>+ {t('Dodaj dostawe')}</Text>
         </TouchableOpacity>
       </View>
 

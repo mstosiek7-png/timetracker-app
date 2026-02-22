@@ -246,8 +246,8 @@ export function useCreateTimeEntry() {
   return useMutation({
     mutationFn: createTimeEntry,
     onSuccess: () => {
-      // Inwaliduj zapytania związane z wpisami czasu pracy
-      queryClient.invalidateQueries({ queryKey: timeEntryKeys.lists() });
+      // Inwaliduj wszystkie zapytania powiązane z wpisami czasu pracy
+      queryClient.invalidateQueries({ queryKey: timeEntryKeys.all });
     },
     onError: (error: Error) => {
       console.error('Błąd tworzenia wpisu czasu pracy:', error);
@@ -264,8 +264,8 @@ export function useCreateBulkTimeEntries() {
   return useMutation({
     mutationFn: createBulkTimeEntries,
     onSuccess: () => {
-      // Inwaliduj zapytania związane z wpisami czasu pracy
-      queryClient.invalidateQueries({ queryKey: timeEntryKeys.lists() });
+      // Inwaliduj wszystkie zapytania powiązane z wpisami czasu pracy
+      queryClient.invalidateQueries({ queryKey: timeEntryKeys.all });
     },
     onError: (error: Error) => {
       console.error('Błąd tworzenia zbiorczych wpisów czasu pracy:', error);
@@ -282,9 +282,8 @@ export function useUpdateTimeEntry() {
   return useMutation({
     mutationFn: updateTimeEntry,
     onSuccess: (data) => {
-      // Inwaliduj zapytania związane z wpisami czasu pracy
-      queryClient.invalidateQueries({ queryKey: timeEntryKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: timeEntryKeys.detail(data.id) });
+      // Inwaliduj wszystkie zapytania powiązane z wpisami czasu pracy
+      queryClient.invalidateQueries({ queryKey: timeEntryKeys.all });
     },
     onError: (error: Error) => {
       console.error('Błąd aktualizacji wpisu czasu pracy:', error);
@@ -301,8 +300,8 @@ export function useDeleteTimeEntry() {
   return useMutation({
     mutationFn: deleteTimeEntry,
     onSuccess: (data) => {
-      // Inwaliduj zapytania związane z wpisami czasu pracy
-      queryClient.invalidateQueries({ queryKey: timeEntryKeys.lists() });
+      // Inwaliduj wszystkie zapytania powiązane z wpisami czasu pracy
+      queryClient.invalidateQueries({ queryKey: timeEntryKeys.all });
       queryClient.removeQueries({ queryKey: timeEntryKeys.detail(data.id) });
     },
     onError: (error: Error) => {

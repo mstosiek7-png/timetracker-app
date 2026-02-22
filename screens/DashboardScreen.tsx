@@ -2,7 +2,7 @@
 // TimeTracker — Screen: Dashboard
 // Plik: src/screens/DashboardScreen.tsx
 // ============================================================
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, StatusBar, Alert, Modal, TextInput,
@@ -21,6 +21,7 @@ import { useDeleteEmployee } from '../hooks/useEmployees';
 import { AddEntryModal } from '../components/AddEntryModal';
 import { BulkEntryModal } from '../components/BulkEntryModal';
 import { EmployeeForm } from '../components/employee/EmployeeForm';
+import { useI18n } from '../i18n/I18nProvider';
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 
@@ -31,6 +32,10 @@ export default function DashboardScreen({ navigation }: Props) {
   const [editingEntry, setEditingEntry]   = useState<{ id: string; hours: number } | null>(null);
   const [editHours, setEditHours]         = useState('');
   const [fabOpen, setFabOpen]             = useState(false);
+  const [toastMessage, setToastMessage]   = useState('');
+  const [toastVisible, setToastVisible]   = useState(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { t } = useI18n();
 
   const { data: allEntries = [], isLoading: loadingEntries } = useTimeEntries();
   const { workers } = useWorkers();
@@ -38,42 +43,64 @@ export default function DashboardScreen({ navigation }: Props) {
   const updateEntry = useUpdateTimeEntry();
   const deleteEmployee = useDeleteEmployee();
 
-  const recentEntries = allEntries.slice(0, 10).map(e => ({
+  const recentEntries = allEntries.slice(0, 5).map(e => ({
     id: e.id,
     workerId: e.employee_id,
-    workerName: workers.find(w => w.id === e.employee_id)?.firstName ?? 'Pracownik',
+    workerName: workers.find(w => w.id === e.employee_id)?.firstName ?? t('Pracownik'),
     date: new Date(e.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
     hours: e.hours,
-    status: e.status === 'work' ? 'Praca' : e.status === 'sick' ? 'Chorobowe' : e.status === 'vacation' ? 'Urlop' : 'FZA',
+    status: e.status === 'work' ? t('Praca') : e.status === 'sick' ? t('Chorobowe') : e.status === 'vacation' ? t('Urlop') : t('FZA'),
   }));
 
   const today = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
 
-  // ─── Header right: date + logout ───────────────────────────
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      setToastVisible(false);
+    }, 2200);
+  };
+
+  // ─── Header right: date above logout + language ───────────
+  const HeaderRightTop = <Text style={styles.headerDate}>{today}</Text>;
   const HeaderRight = (
-    <View style={styles.headerRight}>
-      <Text style={styles.headerDate}>{today}</Text>
-      <TouchableOpacity style={styles.logoutBtn} onPress={() => {/* logout logic */}}>
-        <Text style={styles.logoutText}>⇥ Wyloguj</Text>
-      </TouchableOpacity>
-    </View>
+    <TouchableOpacity style={styles.logoutBtn} onPress={() => {/* logout logic */}}>
+      <Text style={styles.logoutText}>⇥ {t('Wyloguj')}</Text>
+    </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.orange} />
 
-      <AppHeader title="TimeTracker" subtitle="Dashboard" rightElement={HeaderRight} />
+      <AppHeader
+        title={t('TimeTracker')}
+        subtitle={t('Dashboard')}
+        rightElementTop={HeaderRightTop}
+        rightElement={HeaderRight}
+      />
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         {/* ─── Recent entries ────────────────────────────── */}
         <Card
-          title="Ostatnie wpisy"
-          rightElement={<GhostButton label="Zobacz wszystkie" onPress={() => navigation.navigate('AllEntries')} />}
+          title={t('Ostatnie wpisy')}
+          rightElement={<GhostButton label={t('Zobacz wszystkie')} onPress={() => navigation.navigate('AllEntries')} />}
         >
           {recentEntries.length === 0 ? (
-            <Text style={styles.emptyText}>Brak wpisów — dodaj pierwszy!</Text>
+            <Text style={styles.emptyText}>{t('Brak wpisow — dodaj pierwszy!')}</Text>
           ) : (
             recentEntries.map((entry, i) => (
               <View key={entry.id}>
@@ -92,9 +119,9 @@ export default function DashboardScreen({ navigation }: Props) {
                       <Text>✏️</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.iconBtn} onPress={() => {
-                      Alert.alert('Usuń wpis', 'Czy na pewno usunąć ten wpis?', [
-                        { text: 'Anuluj', style: 'cancel' },
-                        { text: 'Usuń', style: 'destructive', onPress: () => { deleteEntry.mutate(entry.id); } },
+                      Alert.alert(t('Usun wpis'), t('Czy na pewno usunac ten wpis?'), [
+                        { text: t('Anuluj'), style: 'cancel' },
+                        { text: t('Usun'), style: 'destructive', onPress: () => { deleteEntry.mutate(entry.id); } },
                       ]);
                     }}>
                       <Text>🗑️</Text>
@@ -107,7 +134,7 @@ export default function DashboardScreen({ navigation }: Props) {
         </Card>
 
         {/* ─── Workers ───────────────────────────────────── */}
-        <Card title="Pracownicy">
+        <Card title={t('Pracownicy')}>
           <View style={styles.workerChips}>
             {workers.map(w => (
               <WorkerChip key={w.id} name={w.firstName} onPress={() => navigation.navigate('WorkerDetail', { workerId: w.id })} />
@@ -117,29 +144,34 @@ export default function DashboardScreen({ navigation }: Props) {
 
         {/* ─── Manage workers ────────────────────────────── */}
         <Card
-          title="Zarządzanie pracownikami"
-          rightElement={<GhostButton label="Zobacz wszystkich" onPress={() => navigation.navigate('Workers')} />}
+          title={t('Zarzadzanie pracownikami')}
+          rightElement={<GhostButton label={t('Zobacz wszystkich')} onPress={() => navigation.navigate('Workers')} />}
         >
           {workers.map((w, i) => (
             <View key={w.id}>
               {i > 0 && <Divider style={{ marginVertical: 0 }} />}
-              <View style={styles.manageRow}>
+              <TouchableOpacity
+                style={styles.manageRow}
+                onPress={() => navigation.navigate('WorkerDetail', { workerId: w.id })}
+                activeOpacity={0.7}
+              >
                 <View>
                   <Text style={styles.manageName}>{w.firstName}</Text>
                   <Text style={styles.manageRole}>{w.lastName}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                  <Badge label={w.currentStatus ?? 'Praca'} variant={(w.currentStatus?.toLowerCase() ?? 'praca') as any} />
-                  <TouchableOpacity style={styles.iconBtn} onPress={() => {
-                    Alert.alert('Usuń pracownika', `Czy na pewno usunąć pracownika ${w.firstName}?`, [
-                      { text: 'Anuluj', style: 'cancel' },
-                      { text: 'Usuń', style: 'destructive', onPress: () => { deleteEmployee.mutate(w.id); } },
+                  <Badge label={w.currentStatus ? t(w.currentStatus) : t('Praca')} variant={(w.currentStatus?.toLowerCase() ?? 'praca') as any} />
+                  <TouchableOpacity style={styles.iconBtn} onPress={(event) => {
+                    event.stopPropagation();
+                    Alert.alert(t('Usun pracownika'), t('Czy na pewno usunac pracownika') + ` ${w.firstName}?`, [
+                      { text: t('Anuluj'), style: 'cancel' },
+                      { text: t('Usun'), style: 'destructive', onPress: () => { deleteEmployee.mutate(w.id); } },
                     ]);
                   }}>
                     <Text>🗑️</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
             </View>
           ))}
         </Card>
@@ -160,15 +192,15 @@ export default function DashboardScreen({ navigation }: Props) {
         <View style={styles.fabMenu}>
           <TouchableOpacity style={styles.fabOption} onPress={() => { setFabOpen(false); setShowAddModal(true); }}>
             <View style={styles.fabOptionIcon}><Text>✏️</Text></View>
-            <Text style={styles.fabOptionText}>Dodaj wpis</Text>
+            <Text style={styles.fabOptionText}>{t('Dodaj wpis')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.fabOption} onPress={() => { setFabOpen(false); setShowBulkModal(true); }}>
             <View style={styles.fabOptionIcon}><Text>👥</Text></View>
-            <Text style={styles.fabOptionText}>Wszyscy</Text>
+            <Text style={styles.fabOptionText}>{t('Wszyscy')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.fabOption} onPress={() => { setFabOpen(false); setShowEmployeeForm(true); }}>
             <View style={styles.fabOptionIcon}><Text>👤</Text></View>
-            <Text style={styles.fabOptionText}>Dodaj pracownika</Text>
+            <Text style={styles.fabOptionText}>{t('Dodaj pracownika')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -180,27 +212,39 @@ export default function DashboardScreen({ navigation }: Props) {
         fabOpen={fabOpen}
       />
 
+      {toastVisible && (
+        <View pointerEvents="none" style={styles.toastWrap}>
+          <View style={styles.toast}>
+            <Text style={styles.toastText}>{toastMessage}</Text>
+          </View>
+        </View>
+      )}
+
       {/* Modals */}
       <AddEntryModal visible={showAddModal} onClose={() => setShowAddModal(false)} />
-      <BulkEntryModal visible={showBulkModal} onClose={() => setShowBulkModal(false)} />
+      <BulkEntryModal
+        visible={showBulkModal}
+        onClose={() => setShowBulkModal(false)}
+        onSaved={(count) => showToast(`${t('Zapisano wpisy')}: ${count}`)}
+      />
       <EmployeeForm visible={showEmployeeForm} onClose={() => setShowEmployeeForm(false)} mode="create" />
 
       {/* Edit Hours Modal */}
       <Modal visible={!!editingEntry} transparent animationType="fade" onRequestClose={() => setEditingEntry(null)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setEditingEntry(null)} />
         <View style={styles.editModal}>
-          <Text style={styles.editModalTitle}>Edytuj godziny</Text>
+          <Text style={styles.editModalTitle}>{t('Edytuj godziny')}</Text>
           <TextInput
             style={styles.editModalInput}
             value={editHours}
             onChangeText={setEditHours}
             keyboardType="decimal-pad"
-            placeholder="np. 8.5"
+            placeholder={t('np. 8.5')}
             placeholderTextColor={Colors.grayLight}
           />
           <View style={styles.editModalBtns}>
             <TouchableOpacity style={[styles.editModalBtn, styles.editModalBtnCancel]} onPress={() => setEditingEntry(null)}>
-              <Text style={styles.editModalBtnCancelText}>Anuluj</Text>
+              <Text style={styles.editModalBtnCancelText}>{t('Anuluj')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.editModalBtn, styles.editModalBtnSave]}
@@ -212,7 +256,7 @@ export default function DashboardScreen({ navigation }: Props) {
                 }
               }}
             >
-              <Text style={styles.editModalBtnSaveText}>Zapisz</Text>
+              <Text style={styles.editModalBtnSaveText}>{t('Zapisz')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -226,7 +270,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: Colors.cream },
   scrollContent: { paddingBottom: 120, paddingTop: Spacing.lg },
 
-  headerRight: { alignItems: 'flex-end', gap: 6 },
   headerDate: { fontSize: 12, fontFamily: FontFamily.bold, color: 'rgba(255,255,255,0.8)' },
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -311,4 +354,22 @@ const styles = StyleSheet.create({
   editModalBtnCancelText: { color: Colors.black, fontFamily: FontFamily.semiBold, fontSize: FontSize.md },
   editModalBtnSave: { backgroundColor: Colors.orange },
   editModalBtnSaveText: { color: '#fff', fontFamily: FontFamily.semiBold, fontSize: FontSize.md },
+
+  toastWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 92,
+    alignItems: 'center',
+    zIndex: 60,
+  },
+  toast: {
+    backgroundColor: Colors.black,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    maxWidth: '90%',
+    ...Shadows.md,
+  },
+  toastText: { color: '#fff', fontSize: 13, fontFamily: FontFamily.semiBold },
 });

@@ -14,6 +14,7 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { supabase } from '@/services/supabase';
 import { Session } from '@supabase/supabase-js';
 import { useFonts } from 'expo-font';
+import { I18nProvider } from '@/i18n/I18nProvider';
 import {
   DMSans_400Regular,
   DMSans_500Medium,
@@ -133,9 +134,11 @@ export default function RootLayout() {
       <PaperProvider theme={theme}>
         <SafeAreaProvider>
           <StatusBar style="auto" />
-          <ErrorBoundary>
-            <RootLayoutNav />
-          </ErrorBoundary>
+          <I18nProvider>
+            <ErrorBoundary>
+              <RootLayoutNav />
+            </ErrorBoundary>
+          </I18nProvider>
         </SafeAreaProvider>
       </PaperProvider>
     </QueryClientProvider>

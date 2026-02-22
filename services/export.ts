@@ -8,9 +8,10 @@ import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
-import { format } from 'date-fns';
-import { pl } from 'date-fns/locale';
+import { format, type Locale } from 'date-fns';
+import { de, pl } from 'date-fns/locale';
 import { TimeEntry } from '../types/models';
+import { Language, strings, StringKey } from '../i18n/strings';
 
 // Types for Supabase response
 interface TimeEntryWithEmployee {
@@ -31,6 +32,7 @@ export interface ExportOptions {
   employeeIds?: string[];
   includeNotes?: boolean;
   format: 'excel' | 'pdf';
+  language?: Language;
 }
 
 export interface ReportData {
@@ -40,6 +42,14 @@ export interface ReportData {
   hours: number;
   status: string;
   notes?: string;
+}
+
+function getLocale(language: Language) {
+  return language === 'de' ? de : pl;
+}
+
+function createTranslator(language: Language) {
+  return (key: StringKey) => strings[language][key] ?? key;
 }
 
 // =====================================================
@@ -52,17 +62,20 @@ export interface ReportData {
  */
 export async function generateExcelReport(options: ExportOptions): Promise<string> {
   try {
+    const language = options.language ?? 'pl';
+    const t = createTranslator(language);
+    const dateLocale = getLocale(language);
     // Pobierz dane z bazy
-    const data = await fetchReportData(options);
+    const data = await fetchReportData(options, t, dateLocale);
 
     // Przygotuj nagłówki
     const headers = [
-      'Pracownik',
-      'Stanowisko',
-      'Data',
-      'Godziny',
-      'Status',
-      ...(options.includeNotes ? ['Notatki'] : []),
+      t('Pracownik'),
+      t('Stanowisko'),
+      t('Data'),
+      t('Godziny'),
+      t('Status'),
+      ...(options.includeNotes ? [t('Notatki')] : []),
     ];
 
     // Przygotuj wiersze danych
@@ -71,14 +84,14 @@ export async function generateExcelReport(options: ExportOptions): Promise<strin
       row.position,
       row.date,
       row.hours,
-      translateStatus(row.status),
+      translateStatus(row.status, t),
       ...(options.includeNotes ? [row.notes || ''] : []),
     ]);
 
     // Dodaj podsumowanie
     const totalHours = data.reduce((sum, row) => sum + row.hours, 0);
     rows.push([]); // Pusty wiersz
-    const summaryRow: (string | number)[] = ['Łączna liczba godzin:', '', '', totalHours, ''];
+    const summaryRow: (string | number)[] = [`${t('Laczna liczba godzin')}:`, '', '', totalHours, ''];
     if (options.includeNotes) summaryRow.push('');
     rows.push(summaryRow);
 
@@ -98,13 +111,13 @@ export async function generateExcelReport(options: ExportOptions): Promise<strin
 
     // Utwórz skoroszyt
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Raport czasu pracy');
+    XLSX.utils.book_append_sheet(workbook, worksheet, t('Raport czasu pracy'));
 
     // Generuj plik jako base64
     const wbout = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
 
     // Generuj datę w nazwie pliku
-    const fileName = `raport_${format(options.startDate, 'yyyy-MM-dd')}_${format(options.endDate, 'yyyy-MM-dd')}.xlsx`;
+    const fileName = `${t('raport')}_${format(options.startDate, 'yyyy-MM-dd')}_${format(options.endDate, 'yyyy-MM-dd')}.xlsx`;
     const fileUri = `${FileSystem.documentDirectory}${fileName}`;
 
     // Zapisz do pliku
@@ -115,7 +128,7 @@ export async function generateExcelReport(options: ExportOptions): Promise<strin
     return fileUri;
   } catch (error) {
     console.error('Błąd generowania raportu Excel:', error);
-    throw new Error('Nie udało się wygenerować raportu Excel');
+    throw new Error(createTranslator(options.language ?? 'pl')('Nie udalo sie wygenerowac raportu Excel'));
   }
 }
 
@@ -129,8 +142,11 @@ export async function generateExcelReport(options: ExportOptions): Promise<strin
  */
 export async function generatePdfReport(options: ExportOptions): Promise<string> {
   try {
+    const language = options.language ?? 'pl';
+    const t = createTranslator(language);
+    const dateLocale = getLocale(language);
     // Pobierz dane z bazy
-    const data = await fetchReportData(options);
+    const data = await fetchReportData(options, t, dateLocale);
     
     // Przygotuj HTML do druku
     const totalHours = data.reduce((sum, row) => sum + row.hours, 0);
@@ -142,7 +158,7 @@ export async function generatePdfReport(options: ExportOptions): Promise<string>
         <td style="border: 1px solid #ccc; padding: 4px;">${row.position}</td>
         <td style="border: 1px solid #ccc; padding: 4px;">${row.date}</td>
         <td style="border: 1px solid #ccc; padding: 4px;">${row.hours.toFixed(2)}</td>
-        <td style="border: 1px solid #ccc; padding: 4px;">${translateStatus(row.status)}</td>
+        <td style="border: 1px solid #ccc; padding: 4px;">${translateStatus(row.status, t)}</td>
         ${options.includeNotes ? `<td style="border: 1px solid #ccc; padding: 4px;">${row.notes || ''}</td>` : ''}
       </tr>
     `).join('');
@@ -164,19 +180,19 @@ export async function generatePdfReport(options: ExportOptions): Promise<string>
         </style>
       </head>
       <body>
-        <h1>Raport czasu pracy</h1>
-        <h2>Okres: ${format(options.startDate, 'dd.MM.yyyy', { locale: pl })} - ${format(options.endDate, 'dd.MM.yyyy', { locale: pl })}</h2>
-        <h2>Wygenerowano: ${format(new Date(), 'dd.MM.yyyy HH:mm', { locale: pl })}</h2>
+        <h1>${t('Raport czasu pracy')}</h1>
+        <h2>${t('Okres')}: ${format(options.startDate, 'dd.MM.yyyy', { locale: dateLocale })} - ${format(options.endDate, 'dd.MM.yyyy', { locale: dateLocale })}</h2>
+        <h2>${t('Wygenerowano')}: ${format(new Date(), 'dd.MM.yyyy HH:mm', { locale: dateLocale })}</h2>
         
         <table>
           <thead>
             <tr>
-              <th>Pracownik</th>
-              <th>Stanowisko</th>
-              <th>Data</th>
-              <th>Godziny</th>
-              <th>Status</th>
-              ${options.includeNotes ? '<th>Notatki</th>' : ''}
+              <th>${t('Pracownik')}</th>
+              <th>${t('Stanowisko')}</th>
+              <th>${t('Data')}</th>
+              <th>${t('Godziny')}</th>
+              <th>${t('Status')}</th>
+              ${options.includeNotes ? `<th>${t('Notatki')}</th>` : ''}
             </tr>
           </thead>
           <tbody>
@@ -185,11 +201,11 @@ export async function generatePdfReport(options: ExportOptions): Promise<string>
         </table>
         
         <div class="summary">
-          <strong>Łączna liczba godzin: ${totalHours.toFixed(2)}</strong>
+          <strong>${t('Laczna liczba godzin')}: ${totalHours.toFixed(2)}</strong>
         </div>
         
         <div class="footer">
-          TimeTracker • asphaltbau • Wygenerowano automatycznie
+          TimeTracker • asphaltbau • ${t('Wygenerowano automatycznie')}
         </div>
       </body>
       </html>
@@ -203,7 +219,7 @@ export async function generatePdfReport(options: ExportOptions): Promise<string>
     });
 
     // Generuj datę w nazwie pliku
-    const fileName = `raport_${format(options.startDate, 'yyyy-MM-dd')}_${format(options.endDate, 'yyyy-MM-dd')}.pdf`;
+    const fileName = `${t('raport')}_${format(options.startDate, 'yyyy-MM-dd')}_${format(options.endDate, 'yyyy-MM-dd')}.pdf`;
     const newUri = `${FileSystem.documentDirectory}${fileName}`;
     
     // Skopiuj do docelowej lokalizacji
@@ -215,7 +231,7 @@ export async function generatePdfReport(options: ExportOptions): Promise<string>
     return newUri;
   } catch (error) {
     console.error('Błąd generowania raportu PDF:', error);
-    throw new Error('Nie udało się wygenerować raportu PDF');
+    throw new Error(createTranslator(options.language ?? 'pl')('Nie udalo sie wygenerowac raportu PDF'));
   }
 }
 
@@ -226,7 +242,11 @@ export async function generatePdfReport(options: ExportOptions): Promise<string>
 /**
  * Pobiera dane do raportu z bazy danych
  */
-async function fetchReportData(options: ExportOptions): Promise<ReportData[]> {
+async function fetchReportData(
+  options: ExportOptions,
+  t: (key: StringKey) => string,
+  dateLocale: Locale
+): Promise<ReportData[]> {
   const { data, error } = await supabase
     .from('time_entries')
     .select(`
@@ -244,7 +264,7 @@ async function fetchReportData(options: ExportOptions): Promise<ReportData[]> {
     .order('date', { ascending: false });
   
   if (error) {
-    throw new Error(`Błąd pobierania danych: ${error.message}`);
+    throw new Error(`${t('Blad pobierania danych')}: ${error.message}`);
   }
   
   // Transformuj dane
@@ -252,9 +272,9 @@ async function fetchReportData(options: ExportOptions): Promise<ReportData[]> {
     // Supabase może zwrócić relację jako obiekt lub tablicę
     const employee = Array.isArray(entry.employees) ? entry.employees[0] : entry.employees;
     return {
-      employeeName: employee?.name || 'Nieznany',
+      employeeName: employee?.name || t('Nieznany'),
       position: employee?.position || '',
-      date: format(new Date(entry.date), 'dd.MM.yyyy'),
+      date: format(new Date(entry.date), 'dd.MM.yyyy', { locale: dateLocale }),
       hours: entry.hours,
       status: entry.status,
       notes: entry.notes
@@ -265,12 +285,12 @@ async function fetchReportData(options: ExportOptions): Promise<ReportData[]> {
 /**
  * Tłumaczy status na język polski
  */
-function translateStatus(status: string): string {
+function translateStatus(status: string, t: (key: StringKey) => string): string {
   const translations: Record<string, string> = {
-    'work': 'Praca',
-    'sick': 'Chorobowe',
-    'vacation': 'Urlop',
-    'fza': 'FZA'
+    work: t('Praca'),
+    sick: t('Chorobowe'),
+    vacation: t('Urlop'),
+    fza: t('FZA')
   };
   
   return translations[status] || status;
@@ -279,23 +299,24 @@ function translateStatus(status: string): string {
 /**
  * Udostępnia plik użytkownikowi (do pobrania/wysłania)
  */
-export async function shareReport(fileUri: string): Promise<void> {
+export async function shareReport(fileUri: string, language: Language = 'pl'): Promise<void> {
+  const t = createTranslator(language);
   console.log('shareReport called with:', fileUri);
   
   // Check if file exists
   const fileInfo = await FileSystem.getInfoAsync(fileUri);
   if (!fileInfo.exists) {
-    throw new Error('Plik raportu nie został znaleziony');
+    throw new Error(t('Plik raportu nie zostal znaleziony'));
   }
   
   if (!(await Sharing.isAvailableAsync())) {
-    throw new Error('Udostępnianie nie jest dostępne na tym urządzeniu');
+    throw new Error(t('Udostepnianie nie jest dostepne na tym urzadzeniu'));
   }
   
   console.log('Opening share dialog...');
   const result = await Sharing.shareAsync(fileUri, {
     mimeType: fileUri.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    dialogTitle: 'Udostępnij raport',
+    dialogTitle: t('Udostepnij raport'),
     UTI: fileUri.endsWith('.pdf') ? 'com.adobe.pdf' : 'org.openxmlformats.spreadsheetml.sheet'
   });
   console.log('Share result:', result);

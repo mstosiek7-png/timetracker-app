@@ -20,6 +20,7 @@ import { theme } from '../../constants/theme';
 import { supabase } from '../../services/supabase';
 import Card from '../../components/ui/Card';
 import SectionTitle from '../../components/ui/SectionTitle';
+import { useI18n } from '../../i18n/I18nProvider';
 
 interface DeliveryDetailRow {
   id: string;
@@ -42,6 +43,7 @@ interface DeliveryDetailRow {
 export default function DeliveryDetailScreen() {
   const router = useRouter();
   const { id: deliveryId } = useLocalSearchParams();
+  const { t, language } = useI18n();
 
   const { data: delivery, isLoading, error } = useQuery({
     queryKey: ['delivery-detail', deliveryId],
@@ -86,7 +88,7 @@ export default function DeliveryDetailScreen() {
   const siteName = delivery?.site_name ?? null;
 
   const timeLabel = delivery?.delivery_time
-    ? new Date(delivery.delivery_time).toLocaleString('pl-PL', {
+    ? new Date(delivery.delivery_time).toLocaleString(language === 'de' ? 'de-DE' : 'pl-PL', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -106,9 +108,9 @@ export default function DeliveryDetailScreen() {
   if (error || !delivery) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorText}>Nie udalo sie zaladowac dostawy</Text>
+        <Text style={styles.errorText}>{t('Nie udalo sie zaladowac dostawy')}</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButtonError}>
-          <Text style={styles.backButtonText}>Wroc</Text>
+          <Text style={styles.backButtonText}>{t('Wroc')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -121,9 +123,9 @@ export default function DeliveryDetailScreen() {
           <Ionicons name="chevron-back" size={24} color={theme.colors.card} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
-          <Text style={styles.headerSubtitle}>Dostawa</Text>
+          <Text style={styles.headerSubtitle}>{t('Dostawa')}</Text>
           <Text style={styles.headerTitleText}>
-            {asphaltName || 'Nieznany typ'}
+            {asphaltName || t('Nieznany typ')}
           </Text>
         </View>
       </View>
@@ -136,25 +138,25 @@ export default function DeliveryDetailScreen() {
               <Text style={styles.tonsUnit}>t</Text>
             </View>
             <View style={styles.tonsInfo}>
-              <Text style={styles.tonsLabel}>{asphaltName || 'Klasa asfaltu'}</Text>
+              <Text style={styles.tonsLabel}>{asphaltName || t('Klasa asfaltu')}</Text>
             </View>
           </View>
         </Card>
 
         <View style={styles.section}>
-          <SectionTitle text="Szczegoly" />
+          <SectionTitle text={t('Szczegoly')} />
           <Card style={styles.detailCard}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Budowa</Text>
+              <Text style={styles.detailLabel}>{t('Budowa')}</Text>
               <Text style={styles.detailValue}>{siteName || '—'}</Text>
             </View>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Data i godzina</Text>
+              <Text style={styles.detailLabel}>{t('Data i godzina')}</Text>
               <Text style={styles.detailValue}>{timeLabel}</Text>
             </View>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Dostawca</Text>
-              <Text style={styles.detailValue}>{delivery.supplier || 'Brak firmy'}</Text>
+              <Text style={styles.detailLabel}>{t('Dostawca')}</Text>
+              <Text style={styles.detailValue}>{delivery.supplier || t('Brak firmy')}</Text>
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Lieferschein</Text>
@@ -164,14 +166,14 @@ export default function DeliveryDetailScreen() {
         </View>
 
         <View style={styles.section}>
-          <SectionTitle text="Zdjecie" />
+          <SectionTitle text={t('Zdjecie')} />
           <Card style={styles.photoCard}>
             {delivery.photo_url ? (
               <Image source={{ uri: delivery.photo_url }} style={styles.photo} />
             ) : (
               <View style={styles.photoPlaceholder}>
                 <Ionicons name="image-outline" size={28} color={theme.colors.muted} />
-                <Text style={styles.photoText}>Brak zdjecia</Text>
+                <Text style={styles.photoText}>{t('Brak zdjecia')}</Text>
               </View>
             )}
           </Card>

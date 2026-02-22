@@ -6,10 +6,14 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../../theme';
+import { useI18n } from '../../i18n/I18nProvider';
 
-const WEEKDAY_LABELS = ['Pn', 'Wt', 'Sr', 'Cz', 'Pt', 'Sb', 'Nd'];
-const WEEKDAY_FULL = ['Poniedzialek', 'Wtorek', 'Sroda', 'Czwartek', 'Piatek', 'Sobota', 'Niedziela'];
-const MONTHS = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paz', 'Lis', 'Gru'];
+const WEEKDAY_LABELS_PL = ['Pn', 'Wt', 'Sr', 'Cz', 'Pt', 'Sb', 'Nd'];
+const WEEKDAY_FULL_PL = ['Poniedzialek', 'Wtorek', 'Sroda', 'Czwartek', 'Piatek', 'Sobota', 'Niedziela'];
+const MONTHS_PL = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paz', 'Lis', 'Gru'];
+const WEEKDAY_LABELS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const WEEKDAY_FULL_DE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+const MONTHS_DE = ['Jan', 'Feb', 'Mar', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
 function startOfWeek(date: Date) {
   const d = new Date(date);
@@ -32,11 +36,11 @@ function dateKey(date: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function formatWeekLabel(start: Date) {
+function formatWeekLabel(start: Date, months: string[]) {
   const end = addDays(start, 6);
   const startDay = String(start.getDate()).padStart(2, '0');
   const endDay = String(end.getDate()).padStart(2, '0');
-  const monthLabel = MONTHS[end.getMonth()];
+  const monthLabel = months[end.getMonth()];
   const year = end.getFullYear();
   return `${startDay} – ${endDay} ${monthLabel} ${year}`;
 }
@@ -109,6 +113,14 @@ export default function WeeklyView({
 }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedKey, setSelectedKey] = useState(() => dateKey(new Date()));
+  const { language, t } = useI18n();
+  const weekdayLabels = language === 'de' ? WEEKDAY_LABELS_DE : WEEKDAY_LABELS_PL;
+  const weekdayFull = language === 'de' ? WEEKDAY_FULL_DE : WEEKDAY_FULL_PL;
+  const monthsShort = language === 'de' ? MONTHS_DE : MONTHS_PL;
+  const formatTons = (value: number) => {
+    const formatted = value.toFixed(1).replace('.', ',');
+    return `${formatted} t`;
+  };
 
   const { data: sites = [] } = useWeeklyData(weekStart);
 
@@ -122,7 +134,7 @@ export default function WeeklyView({
   }, [weekStart]);
 
   const weekDays = useMemo(() => (
-    WEEKDAY_LABELS.map((label, idx) => {
+    weekdayLabels.map((label, idx) => {
       const dayDate = addDays(weekStart, idx);
       return {
         label,
@@ -131,7 +143,7 @@ export default function WeeklyView({
         dayNumber: dayDate.getDate(),
       };
     })
-  ), [weekStart]);
+  ), [weekStart, weekdayLabels]);
 
   const dayBuckets = useMemo(() => {
     const buckets: Record<string, { deliveries: { siteId: string; siteName: string; status: string | null; tons: number; asphalt: string | null }[] }> = {};
@@ -234,12 +246,12 @@ export default function WeeklyView({
   }, [selectedBucket]);
 
   const selectedDate = weekDays.find(d => d.key === selectedKey)?.date ?? weekStart;
-  const selectedLabel = `${WEEKDAY_FULL[(selectedDate.getDay() + 6) % 7]}, ${String(selectedDate.getDate()).padStart(2, '0')} ${MONTHS[selectedDate.getMonth()]}`;
+  const selectedLabel = `${weekdayFull[(selectedDate.getDay() + 6) % 7]}, ${String(selectedDate.getDate()).padStart(2, '0')} ${monthsShort[selectedDate.getMonth()]}`;
 
   return (
     <View style={styles.container}>
       <View style={styles.weekNav}>
-        <Text style={styles.weekLabel}>{formatWeekLabel(weekStart)}</Text>
+        <Text style={styles.weekLabel}>{formatWeekLabel(weekStart, monthsShort)}</Text>
         <View style={styles.weekArrows}>
           <TouchableOpacity style={styles.weekArrow} onPress={() => setWeekStart(addDays(weekStart, -7))}>
             <Text style={styles.weekArrowText}>‹</Text>
@@ -252,18 +264,18 @@ export default function WeeklyView({
 
       <View style={styles.summaryBar}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{summary.totalTons.toFixed(1)}t</Text>
-          <Text style={styles.summaryLabel}>Ton tyg.</Text>
+          <Text style={styles.summaryValue}>{formatTons(summary.totalTons)}</Text>
+          <Text style={styles.summaryLabel}>{t('Tygodniowo (t)')}</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>{summary.siteCount}</Text>
-          <Text style={styles.summaryLabel}>Budow</Text>
+          <Text style={styles.summaryLabel}>{t('Budow')}</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>{summary.deliveryCount}</Text>
-          <Text style={styles.summaryLabel}>Dostaw</Text>
+          <Text style={styles.summaryLabel}>{t('Dostaw')}</Text>
         </View>
       </View>
 
@@ -294,8 +306,10 @@ export default function WeeklyView({
                 <Text style={[styles.dayName, isToday && styles.dayNameToday, isActive && styles.dayNameActive]}>{day.label}</Text>
                 <Text style={[styles.dayNumber, isActive && styles.dayNumberActive]}>{day.dayNumber}</Text>
                 <View style={[styles.dayDot, hasData && styles.dayDotActive, isActive && styles.dayDotActiveOn]} />
-                <Text style={[styles.dayTons, isActive && styles.dayTonsActive]}>{totalTons.toFixed(1)}t</Text>
-                <Text style={[styles.daySites, isActive && styles.daySitesActive]}>{siteCount} bud.</Text>
+                <Text style={[styles.dayTons, isActive && styles.dayTonsActive]}>{formatTons(totalTons)}</Text>
+                <Text style={[styles.daySites, isActive && styles.daySitesActive]}>
+                  {siteCount} {t('bud.')}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -303,14 +317,14 @@ export default function WeeklyView({
 
         <View style={styles.dayDetailHeader}>
           <Text style={styles.dayDetailTitle}>{selectedLabel}</Text>
-          <Text style={styles.dayDetailMeta}>🚛 {selectedBucket.deliveries.length} dostawy</Text>
+          <Text style={styles.dayDetailMeta}>🚛 {selectedBucket.deliveries.length} {t('dostawy')}</Text>
         </View>
 
         <View style={styles.siteList}>
           {selectedSites.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>Brak budow w tym dniu</Text>
-              <Text style={styles.emptySubtext}>Dodaj budowe z poziomu FAB</Text>
+              <Text style={styles.emptyText}>{t('Brak budow w tym dniu')}</Text>
+              <Text style={styles.emptySubtext}>{t('Dodaj budowe z poziomu FAB')}</Text>
             </View>
           ) : (
             selectedSites.map(site => (
@@ -323,7 +337,7 @@ export default function WeeklyView({
                 <View style={styles.cardTop}>
                   <View style={[styles.statusPill, site.status !== 'active' && styles.statusPillInactive]}>
                     <Text style={[styles.statusPillText, site.status !== 'active' && styles.statusPillTextInactive]}>
-                      {site.status === 'active' ? 'AKTYWNA' : 'ZAMKNIETA'}
+                      {site.status === 'active' ? t('AKTYWNA') : t('ZAMKNIETA')}
                     </Text>
                   </View>
                   <Text style={styles.cardArrow}>›</Text>
@@ -333,7 +347,7 @@ export default function WeeklyView({
                   {(dayTonsBySite[site.id] ?? 0) > 0 && (
                     <View style={[styles.tag, styles.tagOrange]}>
                       <Text style={[styles.tagText, styles.tagTextOrange]}>
-                        🚛 {dayTonsBySite[site.id].toFixed(1)}t
+                        🚛 {formatTons(dayTonsBySite[site.id])}
                       </Text>
                     </View>
                   )}

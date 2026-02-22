@@ -1,10 +1,11 @@
 // ============================================================
 // useReports — stats + export report generation
 // ============================================================
-import { useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { format } from 'date-fns';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   documentDirectory,
   writeAsStringAsync,
@@ -16,6 +17,7 @@ import {
   shareReport,
   ExportOptions
 } from '../services/export';
+import { useI18n } from '../i18n/I18nProvider';
 
 export interface ReportStats {
   totalHours: number;
@@ -36,6 +38,8 @@ export interface SavedReport {
   uri?: string;
 }
 
+const SAVED_REPORTS_KEY = 'timetracker:savedReports';
+
 const STATUS_MAP: Record<string, keyof ReportStats['byStatus']> = {
   work: 'praca',
   sick: 'chorobowe',
@@ -44,7 +48,33 @@ const STATUS_MAP: Record<string, keyof ReportStats['byStatus']> = {
 };
 
 export function useReports() {
+  const { language } = useI18n();
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+
+  useEffect(() => {
+    const loadSavedReports = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(SAVED_REPORTS_KEY);
+        if (stored) {
+          setSavedReports(JSON.parse(stored));
+        }
+      } catch (error) {
+        console.warn('Nie udalo sie odczytac zapisanych raportow:', error);
+      }
+    };
+    loadSavedReports();
+  }, []);
+
+  useEffect(() => {
+    const saveReports = async () => {
+      try {
+        await AsyncStorage.setItem(SAVED_REPORTS_KEY, JSON.stringify(savedReports));
+      } catch (error) {
+        console.warn('Nie udalo sie zapisac raportow:', error);
+      }
+    };
+    saveReports();
+  }, [savedReports]);
 
   // Helper: build stats from fetched entries
   function buildStats(entries: any[]): ReportStats {
@@ -132,7 +162,8 @@ export function useReports() {
         endDate: dateTo,
         employeeIds: workerIds.length > 0 ? workerIds : undefined,
         includeNotes,
-        format: fmt === 'xlsx' ? 'excel' : 'pdf'
+        format: fmt === 'xlsx' ? 'excel' : 'pdf',
+        language,
       };
 
       // Generate the appropriate format
@@ -151,16 +182,13 @@ export function useReports() {
         { 
           id: Date.now().toString(), 
           name: fileName, 
-          createdAt: new Date().toLocaleString('pl-PL'),
+          createdAt: new Date().toLocaleString(language === 'de' ? 'de-DE' : 'pl-PL'),
           uri: fileUri
         },
         ...prev,
       ]);
 
-      // Share the generated file - this opens the share dialog
-      console.log('Opening share dialog for:', fileUri);
-      await shareReport(fileUri);
-      console.log('Share dialog closed');
+      // Report is saved; sharing is triggered manually from the list
     } catch (error) {
       console.error('Error generating report:', error);
       throw error;
@@ -173,7 +201,7 @@ export function useReports() {
       if (!report.uri) {
         throw new Error('Report URI not found');
       }
-      await shareReport(report.uri);
+      await shareReport(report.uri, language);
     } catch (error) {
       console.error('Error sharing report:', error);
       throw error;

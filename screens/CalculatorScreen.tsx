@@ -11,17 +11,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppHeader, BottomNav } from '../components/ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../theme';
+import { useI18n } from '../i18n/I18nProvider';
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 
-const ADDONS = [
-  { label: '+ 5%',    value: 5    },
-  { label: '+ 10%',   value: 10   },
-  { label: 'Własny %', value: -1  },
-];
-
 export default function CalculatorScreen({ navigation }: Props) {
+  const { t } = useI18n();
   const [density, setDensity]     = useState(2.40);
+    const ADDONS = [
+      { label: t('+ 5%'), value: 5 },
+      { label: t('+ 10%'), value: 10 },
+      { label: t('Wlasny %'), value: -1 },
+    ];
+
   const [area, setArea]           = useState('');
   const [thickness, setThickness] = useState('');
   const [addon, setAddon]         = useState<number | null>(null);
@@ -56,7 +58,7 @@ export default function CalculatorScreen({ navigation }: Props) {
       setDensity(v);
       setShowDensityModal(false);
     } else {
-      Alert.alert('Błąd', 'Podaj poprawną gęstość (t/m³).');
+      Alert.alert(t('Blad'), t('Podaj poprawna gestosc (t/m3).'));
     }
   }
 
@@ -70,7 +72,7 @@ export default function CalculatorScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.orange} />
-      <AppHeader title="Kalkulator Asfaltu" />
+      <AppHeader title={t('Kalkulator Asfaltu')} />
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={{ height: Spacing.lg }} />
@@ -78,14 +80,14 @@ export default function CalculatorScreen({ navigation }: Props) {
         {/* ─── Density ───────────────────────────────── */}
         <View style={styles.densityCard}>
           <View>
-            <Text style={styles.densityLabel}>Gęstość materiału</Text>
+            <Text style={styles.densityLabel}>{t('Gestosc materialu')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
               <Text style={styles.densityValue}>{density.toFixed(2)}</Text>
               <Text style={styles.densityUnit}>t/m³</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.densityEditBtn} onPress={editDensity}>
-            <Text style={styles.densityEditText}>✏️ Zmień gęstość</Text>
+            <Text style={styles.densityEditText}>✏️ {t('Zmien gestosc')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -112,7 +114,7 @@ export default function CalculatorScreen({ navigation }: Props) {
         <View style={styles.inputsRow}>
           <View style={styles.inputCard}>
             <View style={styles.inputHeader}>
-              <Text style={styles.inputLabel}>Powierzchnia</Text>
+              <Text style={styles.inputLabel}>{t('Powierzchnia')}</Text>
               <Text style={styles.inputUnit}>m²</Text>
             </View>
             <TextInput
@@ -126,7 +128,7 @@ export default function CalculatorScreen({ navigation }: Props) {
           </View>
           <View style={styles.inputCard}>
             <View style={styles.inputHeader}>
-              <Text style={styles.inputLabel}>Grubość warstwy</Text>
+              <Text style={styles.inputLabel}>{t('Grubosc warstwy')}</Text>
               <Text style={styles.inputUnit}>cm</Text>
             </View>
             <TextInput
@@ -156,7 +158,7 @@ export default function CalculatorScreen({ navigation }: Props) {
 
         {/* ─── Result ────────────────────────────────── */}
         <View style={styles.resultCard}>
-          <Text style={styles.resultLabel}>Wynik bazowy</Text>
+          <Text style={styles.resultLabel}>{t('Wynik bazowy')}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
             <Text style={styles.resultValue}>{fmt(baseResult)}</Text>
             <Text style={styles.resultUnit}>t</Text>
@@ -165,7 +167,7 @@ export default function CalculatorScreen({ navigation }: Props) {
 
         {/* ─── Addon ─────────────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Naddatek</Text>
+          <Text style={styles.cardTitle}>{t('Naddatek')}</Text>
           <View style={styles.addonRow}>
             {ADDONS.map((a, i) => (
               <TouchableOpacity
@@ -186,7 +188,7 @@ export default function CalculatorScreen({ navigation }: Props) {
                 value={customAddon}
                 onChangeText={setCustomAddon}
                 keyboardType="decimal-pad"
-                placeholder="Podaj %"
+                placeholder={t('Podaj %')}
                 placeholderTextColor={Colors.grayLight}
               />
             </View>
@@ -196,11 +198,11 @@ export default function CalculatorScreen({ navigation }: Props) {
         {/* ─── Summary strip ─────────────────────────── */}
         <View style={styles.summaryStrip}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Wynik bazowy</Text>
+            <Text style={styles.summaryLabel}>{t('Wynik bazowy')}</Text>
             <Text style={styles.summaryValue}>{fmt(baseResult)} t</Text>
           </View>
           <View style={[styles.summaryRow, styles.summaryTotal]}>
-            <Text style={styles.summaryTotalLabel}>RAZEM</Text>
+            <Text style={styles.summaryTotalLabel}>{t('RAZEM')}</Text>
             <Text style={styles.summaryTotalValue}>{fmt(totalResult)} t</Text>
           </View>
           {hasResult && addon !== null && (
@@ -212,7 +214,7 @@ export default function CalculatorScreen({ navigation }: Props) {
 
         {/* ─── Clear ─────────────────────────────────── */}
         <TouchableOpacity style={styles.clearBtn} onPress={clearAll}>
-          <Text style={styles.clearBtnText}>↺ Wyczyść kalkulator</Text>
+          <Text style={styles.clearBtnText}>↺ {t('Wyczysc kalkulator')}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 24 }} />
@@ -232,8 +234,8 @@ export default function CalculatorScreen({ navigation }: Props) {
           onPress={() => setShowDensityModal(false)}
         />
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Zmień gęstość</Text>
-          <Text style={styles.modalSubtitle}>Podaj nową gęstość (t/m³)</Text>
+          <Text style={styles.modalTitle}>{t('Zmien gestosc')}</Text>
+          <Text style={styles.modalSubtitle}>{t('Podaj nowa gestosc (t/m3)')}</Text>
           <View style={styles.presetRow}>
             {DENSITY_PRESETS.map((preset) => {
               const label = preset.toFixed(2);
@@ -254,7 +256,7 @@ export default function CalculatorScreen({ navigation }: Props) {
             value={densityInput}
             onChangeText={setDensityInput}
             keyboardType="decimal-pad"
-            placeholder="np. 2.40"
+            placeholder={t('np. 2.40')}
             placeholderTextColor={Colors.grayLight}
           />
           <View style={styles.modalActions}>
@@ -262,13 +264,13 @@ export default function CalculatorScreen({ navigation }: Props) {
               style={[styles.modalBtn, styles.modalBtnGhost]}
               onPress={() => setShowDensityModal(false)}
             >
-              <Text style={styles.modalBtnGhostText}>Anuluj</Text>
+              <Text style={styles.modalBtnGhostText}>{t('Anuluj')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modalBtn, styles.modalBtnPrimary]}
               onPress={saveDensity}
             >
-              <Text style={styles.modalBtnPrimaryText}>Zapisz</Text>
+              <Text style={styles.modalBtnPrimaryText}>{t('Zapisz')}</Text>
             </TouchableOpacity>
           </View>
         </View>
