@@ -5,7 +5,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, StatusBar, Alert,
+  StyleSheet, StatusBar, Alert, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,6 +26,10 @@ export default function CalculatorScreen({ navigation }: Props) {
   const [thickness, setThickness] = useState('');
   const [addon, setAddon]         = useState<number | null>(null);
   const [customAddon, setCustomAddon] = useState('');
+  const [showDensityModal, setShowDensityModal] = useState(false);
+  const [densityInput, setDensityInput] = useState(density.toFixed(2));
+
+  const DENSITY_PRESETS = [2.20, 2.30, 2.40, 2.50, 2.60];
 
   const areaNum      = parseFloat(area)      || 0;
   const thicknessNum = parseFloat(thickness) || 0;
@@ -42,17 +46,18 @@ export default function CalculatorScreen({ navigation }: Props) {
   const fmt = (n: number) => hasResult ? n.toFixed(2) : '—';
 
   function editDensity() {
-    Alert.prompt(
-      'Zmień gęstość',
-      'Podaj nową gęstość (t/m³):',
-      (val) => {
-        const v = parseFloat(val);
-        if (!isNaN(v) && v > 0) setDensity(v);
-      },
-      'plain-text',
-      String(density),
-      'decimal-pad'
-    );
+    setDensityInput(density.toFixed(2));
+    setShowDensityModal(true);
+  }
+
+  function saveDensity() {
+    const v = parseFloat(densityInput.replace(',', '.'));
+    if (!isNaN(v) && v > 0) {
+      setDensity(v);
+      setShowDensityModal(false);
+    } else {
+      Alert.alert('Błąd', 'Podaj poprawną gęstość (t/m³).');
+    }
   }
 
   function clearAll() {
@@ -82,6 +87,25 @@ export default function CalculatorScreen({ navigation }: Props) {
           <TouchableOpacity style={styles.densityEditBtn} onPress={editDensity}>
             <Text style={styles.densityEditText}>✏️ Zmień gęstość</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.densityPresetRow}>
+          {DENSITY_PRESETS.map((preset) => {
+            const label = preset.toFixed(2);
+            const isActive = density.toFixed(2) === label;
+            return (
+              <TouchableOpacity
+                key={label}
+                style={[styles.densityPresetChip, isActive && styles.densityPresetChipActive]}
+                onPress={() => {
+                  setDensity(preset);
+                  setDensityInput(label);
+                }}
+              >
+                <Text style={[styles.densityPresetText, isActive && styles.densityPresetTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* ─── Inputs ────────────────────────────────── */}
@@ -195,6 +219,60 @@ export default function CalculatorScreen({ navigation }: Props) {
       </ScrollView>
 
       <BottomNav active="Calculator" onNavigate={(s) => navigation.navigate(s)} />
+
+      <Modal
+        transparent
+        visible={showDensityModal}
+        animationType="fade"
+        onRequestClose={() => setShowDensityModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDensityModal(false)}
+        />
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Zmień gęstość</Text>
+          <Text style={styles.modalSubtitle}>Podaj nową gęstość (t/m³)</Text>
+          <View style={styles.presetRow}>
+            {DENSITY_PRESETS.map((preset) => {
+              const label = preset.toFixed(2);
+              const isActive = densityInput.replace(',', '.') === label;
+              return (
+                <TouchableOpacity
+                  key={label}
+                  style={[styles.presetChip, isActive && styles.presetChipActive]}
+                  onPress={() => setDensityInput(label)}
+                >
+                  <Text style={[styles.presetText, isActive && styles.presetTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TextInput
+            style={styles.modalInput}
+            value={densityInput}
+            onChangeText={setDensityInput}
+            keyboardType="decimal-pad"
+            placeholder="np. 2.40"
+            placeholderTextColor={Colors.grayLight}
+          />
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.modalBtnGhost]}
+              onPress={() => setShowDensityModal(false)}
+            >
+              <Text style={styles.modalBtnGhostText}>Anuluj</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.modalBtnPrimary]}
+              onPress={saveDensity}
+            >
+              <Text style={styles.modalBtnPrimaryText}>Zapisz</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -216,6 +294,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8, paddingHorizontal: 14,
   },
   densityEditText: { fontSize: FontSize.base, fontFamily: FontFamily.semiBold, color: Colors.grayDark },
+  densityPresetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginHorizontal: Spacing.lg, marginBottom: Spacing.md },
+  densityPresetChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderColor: Colors.creamDark,
+    backgroundColor: Colors.cream,
+  },
+  densityPresetChipActive: { borderColor: Colors.orange, backgroundColor: Colors.orangePale },
+  densityPresetText: { fontSize: FontSize.sm, fontFamily: FontFamily.semiBold, color: Colors.grayDark },
+  densityPresetTextActive: { color: Colors.orange },
   inputsRow: { flexDirection: 'row', gap: 10, marginHorizontal: Spacing.lg, marginBottom: Spacing.md },
   inputCard: { flex: 1, backgroundColor: Colors.white, borderRadius: Radius.md, padding: Spacing.md, ...Shadows.sm },
   inputHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
@@ -277,4 +367,50 @@ const styles = StyleSheet.create({
     paddingVertical: 12, alignItems: 'center',
   },
   clearBtnText: { fontSize: FontSize.base, fontFamily: FontFamily.semiBold, color: Colors.grayMid },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  modalCard: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 320,
+    transform: [{ translateX: -160 }, { translateY: -140 }],
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
+    ...Shadows.md,
+  },
+  modalTitle: { fontSize: FontSize.lg, fontFamily: FontFamily.bold, color: Colors.black, marginBottom: 4 },
+  modalSubtitle: { fontSize: FontSize.sm, color: Colors.grayMid, marginBottom: Spacing.md },
+  modalInput: {
+    backgroundColor: Colors.cream,
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderColor: Colors.creamDark,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    fontSize: FontSize.lg,
+    fontFamily: FontFamily.medium,
+    color: Colors.black,
+    marginBottom: Spacing.md,
+  },
+  modalActions: { flexDirection: 'row', gap: 10 },
+  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: Radius.sm, alignItems: 'center' },
+  modalBtnGhost: { backgroundColor: Colors.creamDark },
+  modalBtnGhostText: { color: Colors.black, fontFamily: FontFamily.semiBold, fontSize: FontSize.base },
+  modalBtnPrimary: { backgroundColor: Colors.orange },
+  modalBtnPrimaryText: { color: '#fff', fontFamily: FontFamily.semiBold, fontSize: FontSize.base },
+
+  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: Spacing.md },
+  presetChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderColor: Colors.creamDark,
+    backgroundColor: Colors.cream,
+  },
+  presetChipActive: { borderColor: Colors.orange, backgroundColor: Colors.orangePale },
+  presetText: { fontSize: FontSize.sm, fontFamily: FontFamily.semiBold, color: Colors.grayDark },
+  presetTextActive: { color: Colors.orange },
 });

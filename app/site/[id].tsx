@@ -2,7 +2,7 @@
 // Site Detail Page — Szczegóły budowy
 // =====================================================
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -39,7 +39,7 @@ interface SiteSummaryRow {
 interface DeliveryRow {
   delivery_id: string;
   asphalt_type_name: string | null;
-  tons: number;
+  tons: number | string | null;
   lieferschein_nr: string | null;
   supplier: string | null;
   delivery_time: string;
@@ -110,6 +110,12 @@ export default function SiteDetailScreen() {
     },
     enabled: !!siteId,
   });
+
+  useEffect(() => {
+    if (deliveries && deliveries.length > 0) {
+      console.log('Deliveries sample:', deliveries[0]);
+    }
+  }, [deliveries]);
 
   const handleDelete = () => {
     if (!siteId || typeof siteId !== 'string') {
@@ -182,6 +188,18 @@ export default function SiteDetailScreen() {
     const todayDate = new Date().toLocaleDateString('pl-PL');
     return deliveryDate === todayDate;
   }).length || 0;
+
+  const formatDeliveryTons = (delivery: DeliveryRow) => {
+    const raw = (delivery as any).tons
+      ?? (delivery as any).total_tons
+      ?? (delivery as any).weight
+      ?? (delivery as any).tony;
+    if (raw === null || raw === undefined || raw === '') return '-';
+    const parsed = typeof raw === 'string'
+      ? parseFloat(raw.replace(',', '.'))
+      : Number(raw);
+    return Number.isFinite(parsed) ? parsed.toFixed(1) : '-';
+  };
 
   if (siteLoading) {
     return (
@@ -316,13 +334,16 @@ export default function SiteDetailScreen() {
           ) : deliveries && deliveries.length > 0 ? (
             <View style={styles.deliveryList}>
               {deliveries.map((delivery) => (
-                <Card key={delivery.delivery_id} style={styles.deliveryCard}>
+                <TouchableOpacity
+                  key={delivery.delivery_id}
+                  activeOpacity={0.85}
+                  onPress={() => router.push(`/delivery/${delivery.delivery_id}`)}
+                >
+                  <Card style={styles.deliveryCard}>
                   <View style={styles.deliveryContent}>
                     {/* Tons Box */}
                     <View style={styles.tonsBox}>
-                      <Text style={styles.tonsValue}>
-                        {Number(delivery.tons ?? 0).toFixed(1)}
-                      </Text>
+                      <Text style={styles.tonsValue}>{formatDeliveryTons(delivery)}</Text>
                       <Text style={styles.tonsUnit}>t</Text>
                     </View>
 
@@ -354,6 +375,7 @@ export default function SiteDetailScreen() {
                     )}
                   </View>
                 </Card>
+                </TouchableOpacity>
               ))}
             </View>
           ) : (
@@ -577,7 +599,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xl,
     fontWeight: '900',
     color: theme.colors.accent,
-    lineHeight: 1,
+    lineHeight: theme.fontSize.xl + 4,
   },
   tonsUnit: {
     fontSize: theme.fontSize.xs,
