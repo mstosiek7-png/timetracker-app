@@ -2,7 +2,7 @@
 // Ekran logowania
 // =====================================================
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -16,16 +16,23 @@ import {
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as LocalAuthentication from 'expo-local-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { theme } from '../../constants/theme';
 import { supabase } from '../../services/supabase';
 import { useI18n } from '../../i18n/I18nProvider';
 
 export default function SignInScreen() {
+  const BIOMETRIC_KEY = 'timetracker:biometric-enabled';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isBiometricLoading, setIsBiometricLoading] = useState(false);
+  const [biometricChecked, setBiometricChecked] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
   const { t } = useI18n();
 
   // Logowanie przez email i hasło
@@ -47,6 +54,9 @@ export default function SignInScreen() {
       });
 
       if (error) throw error;
+
+      await AsyncStorage.setItem(BIOMETRIC_KEY, '1');
+      setBiometricEnabled(true);
 
       // Po udanym logowaniu przekieruj do głównego ekranu
       router.replace('/(tabs)');
@@ -80,6 +90,113 @@ export default function SignInScreen() {
       setIsGoogleLoading(false);
     }
   };
+
+  const handleBiometricSignIn = async () => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    setIsBiometricLoading(true);
+    try {
+      const biometricEnabled = await AsyncStorage.getItem(BIOMETRIC_KEY);
+      if (biometricEnabled !== '1') {
+        Alert.alert(t('Blad'), t('Najpierw zaloguj sie haslem'));
+        return;
+      }
+
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      if (!hasHardware) {
+        Alert.alert(t('Blad'), t('Brak czytnika odcisku palca'));
+        return;
+      }
+
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!isEnrolled) {
+        Alert.alert(t('Blad'), t('Brak zapisanych odciskow palca'));
+        return;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: t('Potwierdz odciskiem palca'),
+        cancelLabel: t('Anuluj'),
+      });
+
+      if (!result.success) {
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        Alert.alert(t('Blad'), t('Najpierw zaloguj sie haslem'));
+        return;
+      }
+
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('Blad biometrii:', error);
+      Alert.alert(t('Blad'), t('Nie udalo sie uzyc odcisku palca. Sprobuj ponownie.'));
+    } finally {
+      setIsBiometricLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (biometricChecked || Platform.OS !== 'android') {
+      return;
+    }
+
+    let cancelled = false;
+
+    const attemptBiometric = async () => {
+      const biometricEnabled = await AsyncStorage.getItem(BIOMETRIC_KEY);
+      if (cancelled) {
+        return;
+      }
+      if (biometricEnabled !== '1') {
+        setBiometricChecked(true);
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) {
+        return;
+      }
+      if (!data.session) {
+        setBiometricChecked(true);
+        return;
+      }
+
+      await handleBiometricSignIn();
+      if (!cancelled) {
+        setBiometricChecked(true);
+      }
+    };
+
+    attemptBiometric();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [biometricChecked, handleBiometricSignIn]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    let cancelled = false;
+    const loadBiometricFlag = async () => {
+      const flag = await AsyncStorage.getItem(BIOMETRIC_KEY);
+      if (!cancelled) {
+        setBiometricEnabled(flag === '1');
+      }
+    };
+
+    loadBiometricFlag();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <KeyboardAvoidingView
@@ -117,16 +234,29 @@ export default function SignInScreen() {
           {/* Hasło */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>{t('Haslo')}</Text>
-            <TextInput
-              style={styles.textInput}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••"
-              placeholderTextColor={theme.colors.muted}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <View style={styles.passwordField}>
+              <TextInput
+                style={[styles.textInput, styles.passwordInput]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="••••••••"
+                placeholderTextColor={theme.colors.muted}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword((prev) => !prev)}
+                style={styles.passwordToggle}
+                accessibilityLabel={showPassword ? t('Ukryj haslo') : t('Pokaz haslo')}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={theme.colors.muted}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Przycisk logowania */}
@@ -160,6 +290,24 @@ export default function SignInScreen() {
               {isGoogleLoading ? t('Laczenie...') : t('Kontynuuj przez Google')}
             </Text>
           </TouchableOpacity>
+
+          {Platform.OS === 'android' && (
+            <View>
+              <TouchableOpacity
+                style={[styles.biometricButton, isBiometricLoading && styles.disabledButton]}
+                onPress={handleBiometricSignIn}
+                disabled={isBiometricLoading}
+              >
+                <Ionicons name="finger-print" size={20} color={theme.colors.dark} />
+                <Text style={styles.biometricButtonText}>
+                  {isBiometricLoading ? t('Sprawdzanie...') : t('Zaloguj odciskiem palca')}
+                </Text>
+              </TouchableOpacity>
+              {!biometricEnabled && (
+                <Text style={styles.biometricHint}>{t('Odcisk palca wymaga pierwszego logowania haslem')}</Text>
+              )}
+            </View>
+          )}
 
           {/* Linki pomocnicze */}
           <View style={styles.linksContainer}>
@@ -240,6 +388,18 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     color: theme.colors.dark,
   },
+  passwordField: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: 44,
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 12,
+    padding: 4,
+  },
   signInButton: {
     backgroundColor: theme.colors.accent,
     borderRadius: theme.radius.md,
@@ -285,6 +445,29 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     fontWeight: '700',
     color: theme.colors.dark,
+  },
+  biometricButton: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  biometricButtonText: {
+    fontSize: theme.fontSize.md,
+    fontWeight: '700',
+    color: theme.colors.dark,
+  },
+  biometricHint: {
+    marginTop: theme.spacing.sm,
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.muted,
+    textAlign: 'center',
   },
   linksContainer: {
     marginTop: theme.spacing.xl,

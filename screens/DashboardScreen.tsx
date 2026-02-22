@@ -22,6 +22,8 @@ import { AddEntryModal } from '../components/AddEntryModal';
 import { BulkEntryModal } from '../components/BulkEntryModal';
 import { EmployeeForm } from '../components/employee/EmployeeForm';
 import { useI18n } from '../i18n/I18nProvider';
+import { supabase } from '../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 
@@ -73,10 +75,31 @@ export default function DashboardScreen({ navigation }: Props) {
     }, 2200);
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      t('Potwierdz wylogowanie'),
+      t('Czy na pewno chcesz sie wylogowac?'),
+      [
+        { text: t('Anuluj'), style: 'cancel' },
+        {
+          text: t('Wyloguj'),
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.removeItem('timetracker:biometric-enabled');
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+              Alert.alert(t('Blad'), t('Nie udalo sie wylogowac. Sprobuj ponownie.'));
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // ─── Header right: date above logout + language ───────────
   const HeaderRightTop = <Text style={styles.headerDate}>{today}</Text>;
   const HeaderRight = (
-    <TouchableOpacity style={styles.logoutBtn} onPress={() => {/* logout logic */}}>
+    <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
       <Text style={styles.logoutText}>⇥ {t('Wyloguj')}</Text>
     </TouchableOpacity>
   );
