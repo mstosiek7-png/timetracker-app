@@ -222,27 +222,59 @@ export function Divider({ style }: { style?: ViewStyle }) {
 
 // ─── BottomNav ───────────────────────────────────────────────
 interface NavItem { icon: string; label: string; screen: string; }
-interface BottomNavProps { active: string; onNavigate: (screen: string) => void; }
-const NAV_ITEMS: NavItem[] = [
+interface BottomNavProps { 
+  active: string; 
+  onNavigate: (screen: string) => void; 
+  onFabPress?: () => void;
+  fabOpen?: boolean;
+}
+const NAV_ITEMS_LEFT: NavItem[] = [
   { icon: '⊞', label: 'Dashboard',  screen: 'Dashboard' },
   { icon: '🔧', label: 'Baustellen', screen: 'Baustellen' },
+];
+const NAV_ITEMS_RIGHT: NavItem[] = [
   { icon: '🔢', label: 'Kalkulator', screen: 'Calculator' },
   { icon: '📊', label: 'Raporty',    screen: 'Reports' },
 ];
-export function BottomNav({ active, onNavigate }: BottomNavProps) {
+
+export function BottomNav({ active, onNavigate, onFabPress, fabOpen }: BottomNavProps) {
   return (
-    <View style={styles.bottomNav}>
-      {NAV_ITEMS.map(item => (
-        <TouchableOpacity
-          key={item.screen}
-          onPress={() => onNavigate(item.screen)}
-          style={styles.navItem}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.navIcon, active === item.screen && styles.navIconActive]}>{item.icon}</Text>
-          <Text style={[styles.navLabel, active === item.screen && styles.navLabelActive]}>{item.label}</Text>
-        </TouchableOpacity>
-      ))}
+    <View style={styles.bottomNavContainer}>
+      <View style={styles.bottomNav}>
+        {NAV_ITEMS_LEFT.map(item => (
+          <TouchableOpacity
+            key={item.screen}
+            onPress={() => onNavigate(item.screen)}
+            style={styles.navItem}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.navIcon, active === item.screen && styles.navIconActive]}>{item.icon}</Text>
+            <Text style={[styles.navLabel, active === item.screen && styles.navLabelActive]}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
+        
+        <View style={styles.fabPlaceholder} />
+
+        {NAV_ITEMS_RIGHT.map(item => (
+          <TouchableOpacity
+            key={item.screen}
+            onPress={() => onNavigate(item.screen)}
+            style={styles.navItem}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.navIcon, active === item.screen && styles.navIconActive]}>{item.icon}</Text>
+            <Text style={[styles.navLabel, active === item.screen && styles.navLabelActive]}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <TouchableOpacity 
+        style={[styles.fabMain, fabOpen && styles.fabMainOpen]} 
+        onPress={onFabPress}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.fabMainIcon, fabOpen && styles.fabMainIconOpen]}>+</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -255,14 +287,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xl,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     // paddingTop is set dynamically via useSafeAreaInsets
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   headerRight: {},
-  headerTitle: { fontSize: FontSize.xxl, fontFamily: FontFamily.bold, color: '#fff', letterSpacing: -0.3 },
-  headerSub: { fontSize: FontSize.base, fontFamily: FontFamily.regular, color: 'rgba(255,255,255,0.7)', marginBottom: 2 },
+  headerTitle: { fontSize: 24, fontFamily: FontFamily.bold, color: '#fff', letterSpacing: -0.3 },
+  headerSub: { fontSize: 11, fontFamily: FontFamily.bold, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 },
   backBtn: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -307,8 +339,8 @@ const styles = StyleSheet.create({
   btnOutlineIcon: { fontSize: 15 },
 
   // Badge
-  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: Radius.pill },
-  badgeText: { fontSize: FontSize.xs, fontFamily: FontFamily.semiBold, letterSpacing: 0.4, textTransform: 'uppercase' },
+  badge: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
+  badgeText: { fontSize: 9, fontFamily: FontFamily.bold, letterSpacing: 0.5, textTransform: 'uppercase' },
 
   // Checkbox
   checkbox: {
@@ -375,14 +407,47 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: Colors.creamDark },
 
   // BottomNav
+  bottomNavContainer: {
+    position: 'relative',
+    backgroundColor: 'transparent',
+  },
   bottomNav: {
     flexDirection: 'row', backgroundColor: Colors.white,
     borderTopWidth: 1, borderTopColor: Colors.creamDark,
-    paddingTop: 8, paddingBottom: 4, height: 68,
+    paddingTop: 8, paddingBottom: 20, height: 72,
+    justifyContent: 'space-between',
   },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  navIcon: { fontSize: 20, color: Colors.grayLight },
+  navIcon: { fontSize: 22, color: Colors.grayLight },
   navIconActive: { color: Colors.orange },
-  navLabel: { fontSize: FontSize.xs, fontFamily: FontFamily.medium, color: Colors.grayLight },
+  navLabel: { fontSize: 10, fontFamily: FontFamily.bold, color: Colors.grayLight },
   navLabelActive: { color: Colors.orange },
+  fabPlaceholder: { width: 72 },
+  fabMain: {
+    position: 'absolute',
+    top: -14,
+    left: '50%',
+    marginLeft: -28,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.orange,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.md,
+    shadowColor: Colors.orange,
+    elevation: 6,
+  },
+  fabMainOpen: {
+    transform: [{ rotate: '45deg' }],
+  },
+  fabMainIcon: {
+    color: '#fff',
+    fontSize: 26,
+    lineHeight: 28,
+    marginTop: -2,
+  },
+  fabMainIconOpen: {
+    // Optional: adjust if needed when rotated
+  },
 });

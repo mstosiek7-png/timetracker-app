@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, StatusBar, Alert, Modal, TextInput,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,6 +30,7 @@ export default function DashboardScreen({ navigation }: Props) {
   const [showEmployeeForm, setShowEmployeeForm] = useState(false);
   const [editingEntry, setEditingEntry]   = useState<{ id: string; hours: number } | null>(null);
   const [editHours, setEditHours]         = useState('');
+  const [fabOpen, setFabOpen]             = useState(false);
 
   const { data: allEntries = [], isLoading: loadingEntries } = useTimeEntries();
   const { workers } = useWorkers();
@@ -45,13 +47,6 @@ export default function DashboardScreen({ navigation }: Props) {
     status: e.status === 'work' ? 'Praca' : e.status === 'sick' ? 'Chorobowe' : e.status === 'vacation' ? 'Urlop' : 'FZA',
   }));
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const totalHoursToday = allEntries
-    .filter(e => e.date === todayStr)
-    .reduce((sum, e) => sum + e.hours, 0);
-
-  const entries = allEntries;
-
   const today = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
 
   // ─── Header right: date + logout ───────────────────────────
@@ -59,7 +54,7 @@ export default function DashboardScreen({ navigation }: Props) {
     <View style={styles.headerRight}>
       <Text style={styles.headerDate}>{today}</Text>
       <TouchableOpacity style={styles.logoutBtn} onPress={() => {/* logout logic */}}>
-        <Text style={styles.logoutText}>↪ Wyloguj</Text>
+        <Text style={styles.logoutText}>⇥ Wyloguj</Text>
       </TouchableOpacity>
     </View>
   );
@@ -70,37 +65,7 @@ export default function DashboardScreen({ navigation }: Props) {
 
       <AppHeader title="TimeTracker" subtitle="Dashboard" rightElement={HeaderRight} />
 
-      {/* ─── Stats strip ─────────────────────────────────── */}
-      <View style={styles.statsStrip}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{workers.length}</Text>
-          <Text style={styles.statLabel}>Pracownicy</Text>
-        </View>
-        <View style={[styles.statItem, styles.statBorder]}>
-          <Text style={styles.statValue}>{totalHoursToday}h</Text>
-          <Text style={styles.statLabel}>Dzisiaj</Text>
-        </View>
-        <View style={[styles.statItem, styles.statBorder]}>
-          <Text style={styles.statValue}>{recentEntries.length}</Text>
-          <Text style={styles.statLabel}>Wpisy</Text>
-        </View>
-      </View>
-
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={{ height: Spacing.lg }} />
-
-        {/* ─── Quick Actions ─────────────────────────────── */}
-        <Card>
-          <Text style={styles.cardTitle}>Szybkie akcje</Text>
-          <View style={styles.actionsRow}>
-            <View style={styles.actionButton}>
-              <PrimaryButton label="+ Dodaj wpis" icon="✏️" onPress={() => setShowAddModal(true)} style={{ width: '100%', justifyContent: 'center', minHeight: 52 }} />
-            </View>
-            <View style={styles.actionButton}>
-              <SecondaryButton label="Wszyscy" icon="📋" onPress={() => setShowBulkModal(true)} style={{ width: '100%', justifyContent: 'center', minHeight: 52 }} />
-            </View>
-          </View>
-        </Card>
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         {/* ─── Recent entries ────────────────────────────── */}
         <Card
@@ -115,7 +80,7 @@ export default function DashboardScreen({ navigation }: Props) {
                 {i > 0 && <Divider style={{ marginVertical: 0 }} />}
                 <TouchableOpacity style={styles.entryRow} onPress={() => navigation.navigate('WorkerDetail', { workerId: entry.workerId })} activeOpacity={0.7}>
                   <View style={styles.entryLeft}>
-                    <Avatar name={entry.workerName} size={36} />
+                    <Avatar name={entry.workerName} size={38} />
                     <View>
                       <Text style={styles.entryName}>{entry.workerName}</Text>
                       <Text style={styles.entryMeta}>{entry.date} · {entry.hours}h</Text>
@@ -165,7 +130,7 @@ export default function DashboardScreen({ navigation }: Props) {
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                   <Badge label={w.currentStatus ?? 'Praca'} variant={(w.currentStatus?.toLowerCase() ?? 'praca') as any} />
-                  <TouchableOpacity style={styles.deleteWorkerBtn} onPress={() => {
+                  <TouchableOpacity style={styles.iconBtn} onPress={() => {
                     Alert.alert('Usuń pracownika', `Czy na pewno usunąć pracownika ${w.firstName}?`, [
                       { text: 'Anuluj', style: 'cancel' },
                       { text: 'Usuń', style: 'destructive', onPress: () => { deleteEmployee.mutate(w.id); } },
@@ -177,17 +142,43 @@ export default function DashboardScreen({ navigation }: Props) {
               </View>
             </View>
           ))}
-          <View style={{ marginTop: Spacing.md }}>
-            <TouchableOpacity style={styles.addWorkerBtn} onPress={() => setShowEmployeeForm(true)}>
-              <Text style={styles.addWorkerText}>+ Dodaj pracownika</Text>
-            </TouchableOpacity>
-          </View>
         </Card>
 
-        <View style={{ height: 24 }} />
       </ScrollView>
 
-      <BottomNav active="Dashboard" onNavigate={(screen) => navigation.navigate(screen)} />
+      {/* FAB Menu Overlay */}
+      {fabOpen && (
+        <TouchableOpacity 
+          style={styles.fabOverlay} 
+          activeOpacity={1} 
+          onPress={() => setFabOpen(false)}
+        />
+      )}
+      
+      {/* FAB Menu */}
+      {fabOpen && (
+        <View style={styles.fabMenu}>
+          <TouchableOpacity style={styles.fabOption} onPress={() => { setFabOpen(false); setShowAddModal(true); }}>
+            <View style={styles.fabOptionIcon}><Text>✏️</Text></View>
+            <Text style={styles.fabOptionText}>Dodaj wpis</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.fabOption} onPress={() => { setFabOpen(false); setShowBulkModal(true); }}>
+            <View style={styles.fabOptionIcon}><Text>👥</Text></View>
+            <Text style={styles.fabOptionText}>Wszyscy</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.fabOption} onPress={() => { setFabOpen(false); setShowEmployeeForm(true); }}>
+            <View style={styles.fabOptionIcon}><Text>👤</Text></View>
+            <Text style={styles.fabOptionText}>Dodaj pracownika</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <BottomNav 
+        active="Dashboard" 
+        onNavigate={(screen) => navigation.navigate(screen)} 
+        onFabPress={() => setFabOpen(!fabOpen)}
+        fabOpen={fabOpen}
+      />
 
       {/* Modals */}
       <AddEntryModal visible={showAddModal} onClose={() => setShowAddModal(false)} />
@@ -233,55 +224,71 @@ export default function DashboardScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.cream },
   scroll: { flex: 1, backgroundColor: Colors.cream },
+  scrollContent: { paddingBottom: 120, paddingTop: Spacing.lg },
 
   headerRight: { alignItems: 'flex-end', gap: 6 },
-  headerDate: { fontSize: FontSize.base, fontFamily: FontFamily.medium, color: 'rgba(255,255,255,0.75)' },
+  headerDate: { fontSize: 12, fontFamily: FontFamily.bold, color: 'rgba(255,255,255,0.8)' },
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
-    borderRadius: Radius.pill, paddingVertical: 7, paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20, paddingVertical: 6, paddingHorizontal: 14,
   },
-  logoutText: { color: '#fff', fontSize: FontSize.base, fontFamily: FontFamily.medium },
+  logoutText: { color: '#fff', fontSize: 12, fontFamily: FontFamily.bold },
 
-  statsStrip: {
-    flexDirection: 'row', backgroundColor: Colors.white,
-    borderBottomWidth: 1, borderBottomColor: Colors.creamDark,
-  },
-  statItem: { flex: 1, alignItems: 'center', paddingVertical: Spacing.lg },
-  statBorder: { borderLeftWidth: 1, borderLeftColor: Colors.creamDark },
-  statValue: { fontSize: FontSize.xxl, fontFamily: 'DMMono_700Bold', color: Colors.orange },
-  statLabel: { fontSize: FontSize.xs, fontFamily: FontFamily.semiBold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 2 },
-
-  cardTitle: { fontSize: FontSize.xs, fontFamily: FontFamily.semiBold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.md },
-  actionsRow: { flexDirection: 'row', gap: 10 },
-  actionButton: { flex: 1 },
-
-  entryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.md },
-  entryLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  entryName: { fontSize: FontSize.md, fontFamily: FontFamily.semiBold, color: Colors.black },
-  entryMeta: { fontSize: FontSize.sm, fontFamily: FontFamily.regular, color: Colors.grayMid, marginTop: 1 },
-  entryRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  entryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
+  entryLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  entryName: { fontSize: 15, fontFamily: FontFamily.bold, color: Colors.black },
+  entryMeta: { fontSize: 11, fontFamily: FontFamily.semiBold, color: Colors.grayMid, marginTop: 1 },
+  entryRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   iconBtn: {
     width: 30, height: 30, borderRadius: 8,
-    backgroundColor: Colors.creamDark,
+    backgroundColor: Colors.cream,
     alignItems: 'center', justifyContent: 'center',
   },
 
   workerChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
-  manageRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.md },
-  manageName: { fontSize: FontSize.md, fontFamily: FontFamily.semiBold, color: Colors.black },
-  manageRole: { fontSize: FontSize.sm, fontFamily: FontFamily.regular, color: Colors.grayMid, marginTop: 2 },
-
-  addWorkerBtn: {
-    backgroundColor: Colors.orange, borderRadius: Radius.pill,
-    paddingVertical: 12, alignItems: 'center',
-  },
-  addWorkerText: { color: '#fff', fontFamily: FontFamily.semiBold, fontSize: FontSize.md },
-  deleteWorkerBtn: { padding: 6 },
+  manageRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
+  manageName: { fontSize: 15, fontFamily: FontFamily.bold, color: Colors.black },
+  manageRole: { fontSize: 11, fontFamily: FontFamily.semiBold, color: Colors.grayMid, marginTop: 2 },
 
   emptyText: { fontSize: FontSize.base, color: Colors.grayMid, fontStyle: 'italic', textAlign: 'center', paddingVertical: Spacing.lg },
+
+  // FAB Menu
+  fabOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    zIndex: 45,
+  },
+  fabMenu: {
+    position: 'absolute',
+    bottom: 88,
+    left: '50%',
+    transform: [{ translateX: -100 }], // approximate centering
+    alignItems: 'center',
+    gap: 10,
+    zIndex: 46,
+  },
+  fabOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Colors.white,
+    paddingVertical: 12,
+    paddingLeft: 14,
+    paddingRight: 20,
+    borderRadius: 50,
+    ...Shadows.md,
+  },
+  fabOptionIcon: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: Colors.orangePale,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  fabOptionText: {
+    fontSize: 14, fontFamily: FontFamily.bold, color: Colors.black,
+  },
 
   // Edit Hours Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },

@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390px, initial-scale=1.0">
+<title>TimeTracker App</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --orange: #E8611A;
+    --orange-light: #F28244;
+    --orange-pale: #FDE8D8;
+    --orange-xpale: #FEF3EC;
+    --cream: #F4EFE8;
+    --cream-dark: #EDE6DC;
+    --white: #FFFFFF;
+    --text-dark: #1A1A1A;
+    --text-mid: #666666;
+    --text-light: #AAAAAA;
+    --green: #3DBE7A;
+    --green-pale: #E6F9EE;
+    --blue-pale: #E8F0FE;
+    --blue: #4A7CF7;
+    --purple-pale: #F0E8FE;
+    --purple: #9B59B6;
+    --red-pale: #FDE8E8;
+    --red: #E84040;
+    --yellow-pale: #FEF3DC;
+    --yellow: #E8A020;
+    --radius: 16px;
+    --shadow: 0 4px 20px rgba(0,0,0,0.07);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: #D0C8BC;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 20px 0;
+  }
+
+  /* PHONE WRAPPER */
+  .phone {
+    width: 390px;
+    min-height: 844px;
+    background: var(--cream);
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.3);
+  }
+
+  /* SCREENS */
+  .screen {
+    display: none;
+    flex-direction: column;
+    min-height: 844px;
+  }
+  .screen.active { display: flex; }
+
+  /* ─── SHARED ─── */
+  .statusbar {
+    background: var(--orange);
+    padding: 12px 24px 0;
+    display: flex;
+    justify-content: space-between;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .header {
+    background: var(--orange);
+    padding: 10px 24px 24px;
+    color: white;
+  }
+
+  .header-title {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.3px;
+    color: white;
+  }
+
+  .content {
+    padding: 20px 20px 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .section-card {
+    background: white;
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .section-title {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-light);
+    margin-bottom: 0;
+  }
+
+  .section-link {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--orange);
+    cursor: pointer;
+  }
+
+  /* ─── BOTTOM NAV ─── */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 390px;
+    background: white;
+    border-top: 1px solid var(--cream-dark);
+    display: grid;
+    grid-template-columns: 1fr 1fr 72px 1fr 1fr;
+    align-items: center;
+    padding: 8px 0 20px;
+    z-index: 40;
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .nav-item:hover { opacity: 0.7; }
+
+  .fab-main {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--orange);
+    border: none;
+    color: white;
+    font-size: 26px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(232,97,26,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.25s, box-shadow 0.2s;
+    position: relative;
+    top: -14px;
+    margin: 0 auto;
+  }
+  .fab-main.open { transform: rotate(45deg); }
+  .fab-main:hover { box-shadow: 0 10px 28px rgba(232,97,26,0.5); }
+
+  .nav-icon { font-size: 22px; }
+  .nav-label { font-size: 10px; font-weight: 700; color: var(--text-light); }
+  .nav-item.active .nav-label { color: var(--orange); }
+  .nav-item.active .nav-icon { filter: none; }
+
+  /* ─── FAB MENU ─── */
+  .fab-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 45;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .fab-overlay.open { opacity: 1; pointer-events: all; }
+
+  .fab-menu {
+    position: fixed;
+    bottom: 88px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    z-index: 46;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+  }
+  .fab-menu.open {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .fab-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    border: none;
+    padding: 12px 20px 12px 14px;
+    border-radius: 50px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-dark);
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.15);
+    white-space: nowrap;
+    transition: transform 0.15s;
+  }
+  .fab-option:hover { transform: scale(1.03); }
+
+  .fab-option-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--orange-pale);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* ════════════════════════════
+     SCREEN 1 — DASHBOARD
+  ════════════════════════════ */
+  .dash-header {
+    background: var(--orange);
+    padding: 10px 24px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .dash-header-left .header-sub {
+    font-size: 11px;
+    color: rgba(255,255,255,0.7);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .dash-header-left .header-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: white;
+    letter-spacing: -0.3px;
+  }
+  .dash-header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .header-date { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.8); }
+  .logout-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    font-family: 'Nunito', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+  }
+
+  .wpis-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--cream);
+    animation: fadeIn 0.3s ease both;
+  }
+  .wpis-item:last-child { border-bottom: none; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 900; color: white; flex-shrink: 0;
+  }
+  .wpis-info { flex: 1; }
+  .wpis-name { font-size: 15px; font-weight: 800; color: var(--text-dark); }
+  .wpis-date { font-size: 11px; font-weight: 600; color: var(--text-light); }
+  .wpis-actions { display: flex; align-items: center; gap: 6px; }
+
+  .tag-praca {
+    font-size: 9px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.5px; padding: 4px 8px; border-radius: 6px;
+    background: var(--green-pale); color: var(--green);
+  }
+
+  .icon-btn {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--cream); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; transition: background 0.15s;
+  }
+  .icon-btn:hover { background: var(--cream-dark); }
+
+  .chips-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .worker-chip {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 12px 6px 6px;
+    background: var(--cream); border-radius: 20px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .worker-chip:hover { background: var(--orange-pale); }
+
+  .chip-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 900; color: white;
+  }
+  .chip-name { font-size: 13px; font-weight: 700; color: var(--text-dark); }
+
+  .worker-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--cream);
+  }
+  .worker-row:last-child { border-bottom: none; }
+  .worker-row-left { flex: 1; }
+  .worker-row-name { font-size: 15px; font-weight: 800; color: var(--text-dark); }
+  .worker-row-sub { font-size: 11px; font-weight: 600; color: var(--text-light); }
+  .worker-row-actions { display: flex; align-items: center; gap: 8px; }
+
+  .add-worker-btn {
+    width: 100%; padding: 16px;
+    background: var(--orange); border: none; border-radius: var(--radius);
+    color: white; font-family: 'Nunito', sans-serif;
+    font-size: 15px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(232,97,26,0.35);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .add-worker-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(232,97,26,0.4); }
+
+  /* ════════════════════════════
+     SCREEN 2 — BAUSTELLEN
+  ════════════════════════════ */
+  .week-nav {
+    background: var(--orange);
+    padding: 0 24px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .week-label {
+    color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 700;
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .week-arrows { display: flex; gap: 8px; }
+  .week-arrow {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.2); border: none; color: white;
+    font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+  }
+  .week-arrow:hover { background: rgba(255,255,255,0.35); }
+
+  .summary-bar {
+    margin: 0 20px; margin-top: -12px;
+    background: white; border-radius: 16px; padding: 16px 20px;
+    display: flex; justify-content: space-around;
+    box-shadow: var(--shadow); position: relative; z-index: 10;
+  }
+  .summary-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .summary-value { font-size: 22px; font-weight: 900; color: var(--orange); line-height: 1; }
+  .summary-label { font-size: 10px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-divider { width: 1px; background: var(--cream-dark); align-self: stretch; }
+
+  .days-section { padding: 20px 20px 0; }
+  .days-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 6px; margin-bottom: 16px;
+  }
+
+  .day-chip {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 10px 4px; border-radius: 14px; cursor: pointer;
+    transition: all 0.2s; background: var(--white);
+    border: 2px solid transparent; gap: 4px;
+  }
+  .day-chip:hover { border-color: var(--orange-light); }
+  .day-chip.active {
+    background: var(--orange); border-color: var(--orange);
+    box-shadow: 0 6px 18px rgba(232,97,26,0.35); transform: translateY(-2px);
+  }
+  .day-chip.has-data:not(.active) .day-number { color: var(--orange); }
+  .day-chip.has-data .day-dot { background: var(--orange); }
+  .day-chip.active .day-dot { background: rgba(255,255,255,0.6); }
+  .day-name { font-size: 9px; font-weight: 800; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.3px; }
+  .day-chip.active .day-name { color: rgba(255,255,255,0.75); }
+  .day-number { font-size: 17px; font-weight: 900; color: var(--text-dark); line-height: 1; }
+  .day-chip.active .day-number { color: white; }
+  .day-dot { width: 5px; height: 5px; border-radius: 50%; background: transparent; }
+
+  .day-detail-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px; padding: 0 4px;
+  }
+  .day-detail-title { font-size: 17px; font-weight: 900; color: var(--text-dark); }
+  .day-detail-meta {
+    font-size: 12px; font-weight: 700; color: var(--orange);
+    background: var(--orange-pale); padding: 4px 10px; border-radius: 20px;
+  }
+
+  .baustelle-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 100px; }
+
+  .baustelle-card {
+    background: white; border-radius: var(--radius); padding: 16px;
+    box-shadow: var(--shadow); border-left: 4px solid var(--orange);
+    cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+    animation: slideUp 0.3s ease both;
+  }
+  .baustelle-card:nth-child(1) { animation-delay: 0.0s; }
+  .baustelle-card:nth-child(2) { animation-delay: 0.07s; }
+  .baustelle-card:nth-child(3) { animation-delay: 0.14s; }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .baustelle-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+  .baustelle-card.inactive { border-left-color: var(--cream-dark); opacity: 0.7; }
+
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .card-status {
+    font-size: 9px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.8px; padding: 3px 8px; border-radius: 20px;
+    background: #E6F9EE; color: #2A9955;
+  }
+  .card-status.inactive { background: var(--cream-dark); color: var(--text-light); }
+  .card-arrow { color: var(--text-light); font-size: 14px; }
+  .card-name { font-size: 18px; font-weight: 900; color: var(--text-dark); margin-bottom: 10px; letter-spacing: -0.2px; }
+  .card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag {
+    padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    background: var(--cream); color: var(--text-mid);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .tag.orange { background: var(--orange-pale); color: var(--orange); }
+
+  .empty-state { text-align: center; padding: 40px 20px; animation: slideUp 0.3s ease both; }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-text { font-size: 15px; font-weight: 700; color: var(--text-light); }
+
+  /* ════════════════════════════
+     SCREEN 3 — RAPORTY
+  ════════════════════════════ */
+  .date-pills { display: flex; gap: 8px; margin-bottom: 14px; }
+  .date-pill {
+    flex: 1; padding: 9px 6px; border-radius: 20px; border: none;
+    font-family: 'Nunito', sans-serif; font-size: 12px; font-weight: 800;
+    cursor: pointer; background: var(--cream); color: var(--text-mid);
+    transition: all 0.15s; text-align: center;
+  }
+  .date-pill.active {
+    background: var(--orange); color: white;
+    box-shadow: 0 4px 12px rgba(232,97,26,0.3);
+  }
+  .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .date-field label {
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-light); display: block; margin-bottom: 6px;
+  }
+  .date-input {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--cream); border-radius: 10px; padding: 10px 12px; cursor: pointer;
+  }
+  .date-input span { font-size: 13px; font-weight: 700; color: var(--text-dark); }
+
+  .workers-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .workers-sub { font-size: 11px; font-weight: 600; color: var(--text-light); margin-bottom: 12px; }
+  .worker-actions { display: flex; gap: 10px; }
+  .worker-action-btn {
+    font-size: 11px; font-weight: 700; cursor: pointer;
+    border: none; background: none; font-family: 'Nunito', sans-serif;
+  }
+  .worker-action-btn.select { color: var(--orange); }
+  .worker-action-btn.clear  { color: var(--text-light); }
+
+  .worker-chips-r { display: flex; flex-wrap: wrap; gap: 8px; }
+  .worker-chip-r {
+    padding: 7px 14px; border-radius: 20px; border: 2px solid var(--orange);
+    font-size: 13px; font-weight: 800; color: var(--orange);
+    background: white; cursor: pointer; transition: all 0.15s;
+  }
+  .worker-chip-r.selected { background: var(--orange); color: white; }
+
+  .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .export-option {
+    border-radius: 12px; padding: 20px 16px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    cursor: pointer; border: 2px solid transparent; transition: all 0.15s;
+  }
+  .export-option.active { background: var(--orange); border-color: var(--orange); }
+  .export-option.inactive { background: var(--cream); border-color: transparent; }
+  .export-icon { font-size: 28px; }
+  .export-name { font-size: 14px; font-weight: 900; }
+  .export-option.active .export-name { color: white; }
+  .export-option.inactive .export-name { color: var(--text-dark); }
+  .export-sub { font-size: 11px; font-weight: 600; }
+  .export-option.active .export-sub { color: rgba(255,255,255,0.75); }
+  .export-option.inactive .export-sub { color: var(--text-light); }
+
+  .notes-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .checkbox {
+    width: 20px; height: 20px; border-radius: 6px;
+    border: 2px solid var(--cream-dark);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .checkbox.checked { background: var(--orange); border-color: var(--orange); color: white; font-size: 12px; }
+  .notes-label { font-size: 14px; font-weight: 700; color: var(--text-dark); }
+
+  .status-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 0; border-bottom: 1px solid var(--cream);
+  }
+  .status-row:last-child { border-bottom: none; }
+  .status-badge {
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .status-value { font-size: 17px; font-weight: 900; color: var(--text-dark); }
+
+  .export-btn {
+    width: 100%; padding: 17px; background: var(--orange); border: none;
+    border-radius: var(--radius); color: white;
+    font-family: 'Nunito', sans-serif; font-size: 15px; font-weight: 900;
+    cursor: pointer; box-shadow: 0 6px 18px rgba(232,97,26,0.35);
+    transition: transform 0.15s, box-shadow 0.15s; letter-spacing: 0.2px;
+  }
+  .export-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(232,97,26,0.4); }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- ══════════════════════════════
+       SCREEN: DASHBOARD
+  ══════════════════════════════ -->
+  <div class="screen active" id="screen-dashboard">
+    <div class="statusbar"><span>08:39</span><span>📶 🔋95</span></div>
+    <div class="dash-header">
+      <div class="dash-header-left">
+        <div class="header-sub">Dashboard</div>
+        <div class="header-title">TimeTracker</div>
+      </div>
+      <div class="dash-header-right">
+        <div class="header-date">22.02.2026</div>
+        <button class="logout-btn">⇥ Wyloguj</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">Ostatnie wpisy</span>
+          <span class="section-link">Zobacz wszystkie</span>
+        </div>
+        <div class="wpis-item" style="animation-delay:0.00s">
+          <div class="avatar" style="background:#E8611A">A</div>
+          <div class="wpis-info"><div class="wpis-name">Andi</div><div class="wpis-date">20.02.2026 · 8h</div></div>
+          <div class="wpis-actions"><span class="tag-praca">Praca</span><button class="icon-btn">✏️</button><button class="icon-btn">🗑️</button></div>
+        </div>
+        <div class="wpis-item" style="animation-delay:0.05s">
+          <div class="avatar" style="background:#E8611A">A</div>
+          <div class="wpis-info"><div class="wpis-name">Andi</div><div class="wpis-date">12.02.2026 · 8h</div></div>
+          <div class="wpis-actions"><span class="tag-praca">Praca</span><button class="icon-btn">✏️</button><button class="icon-btn">🗑️</button></div>
+        </div>
+        <div class="wpis-item" style="animation-delay:0.10s">
+          <div class="avatar" style="background:#9B59B6">S</div>
+          <div class="wpis-info"><div class="wpis-name">Sepp</div><div class="wpis-date">12.02.2026 · 8h</div></div>
+          <div class="wpis-actions"><span class="tag-praca">Praca</span><button class="icon-btn">✏️</button><button class="icon-btn">🗑️</button></div>
+        </div>
+        <div class="wpis-item" style="animation-delay:0.15s">
+          <div class="avatar" style="background:#2ECC71">M</div>
+          <div class="wpis-info"><div class="wpis-name">Michał</div><div class="wpis-date">12.02.2026 · 8h</div></div>
+          <div class="wpis-actions"><span class="tag-praca">Praca</span><button class="icon-btn">✏️</button><button class="icon-btn">🗑️</button></div>
+        </div>
+        <div class="wpis-item" style="animation-delay:0.20s">
+          <div class="avatar" style="background:#3498DB">L</div>
+          <div class="wpis-info"><div class="wpis-name">Leo</div><div class="wpis-date">12.02.2026 · 8h</div></div>
+          <div class="wpis-actions"><span class="tag-praca">Praca</span><button class="icon-btn">✏️</button><button class="icon-btn">🗑️</button></div>
+        </div>
+        <div class="wpis-item" style="animation-delay:0.25s">
+          <div class="avatar" style="background:#E67E22">J</div>
+          <div class="wpis-info"><div class="wpis-name">Jacek</div><div class="wpis-date">12.02.2026 · 8h</div></div>
+          <div class="wpis-actions"><span class="tag-praca">Praca</span><button class="icon-btn">✏️</button><button class="icon-btn">🗑️</button></div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header"><span class="section-title">Pracownicy</span></div>
+        <div class="chips-wrap">
+          <div class="worker-chip"><div class="chip-avatar" style="background:#E8611A">A</div><span class="chip-name">Andi</span></div>
+          <div class="worker-chip"><div class="chip-avatar" style="background:#E67E22">J</div><span class="chip-name">Jacek</span></div>
+          <div class="worker-chip"><div class="chip-avatar" style="background:#3498DB">L</div><span class="chip-name">Leo</span></div>
+          <div class="worker-chip"><div class="chip-avatar" style="background:#2ECC71">M</div><span class="chip-name">Michał</span></div>
+          <div class="worker-chip"><div class="chip-avatar" style="background:#9B59B6">S</div><span class="chip-name">Sepp</span></div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">Zarządzanie pracownikami</span>
+          <span class="section-link">Zobacz wszystkich</span>
+        </div>
+        <div class="worker-row"><div class="worker-row-left"><div class="worker-row-name">Andi</div></div><div class="worker-row-actions"><span class="tag-praca">Praca</span><button class="icon-btn">🗑️</button></div></div>
+        <div class="worker-row"><div class="worker-row-left"><div class="worker-row-name">Jacek</div><div class="worker-row-sub">Jakubik</div></div><div class="worker-row-actions"><span class="tag-praca">Praca</span><button class="icon-btn">🗑️</button></div></div>
+        <div class="worker-row"><div class="worker-row-left"><div class="worker-row-name">Leo</div></div><div class="worker-row-actions"><span class="tag-praca">Praca</span><button class="icon-btn">🗑️</button></div></div>
+        <div class="worker-row"><div class="worker-row-left"><div class="worker-row-name">Michał</div><div class="worker-row-sub">Stosiek</div></div><div class="worker-row-actions"><span class="tag-praca">Praca</span><button class="icon-btn">🗑️</button></div></div>
+        <div class="worker-row"><div class="worker-row-left"><div class="worker-row-name">Sepp</div></div><div class="worker-row-actions"><span class="tag-praca">Praca</span><button class="icon-btn">🗑️</button></div></div>
+      </div>
+
+      <button class="add-worker-btn">+ Dodaj pracownika</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════
+       SCREEN: BAUSTELLEN
+  ══════════════════════════════ -->
+  <div class="screen" id="screen-baustellen">
+    <div class="statusbar"><span>08:39</span><span>📶 🔋95</span></div>
+    <div class="header"><div class="header-title">Lista Budów</div></div>
+    <div class="week-nav">
+      <div class="week-label" id="weekLabel">16 – 22 Lut 2026</div>
+      <div class="week-arrows">
+        <button class="week-arrow" onclick="changeWeek(-1)">‹</button>
+        <button class="week-arrow" onclick="changeWeek(1)">›</button>
+      </div>
+    </div>
+    <div class="summary-bar">
+      <div class="summary-item"><span class="summary-value" id="summaryTon">36.0t</span><span class="summary-label">Ton tyg.</span></div>
+      <div class="summary-divider"></div>
+      <div class="summary-item"><span class="summary-value" id="summaryBudow">3</span><span class="summary-label">Budów</span></div>
+      <div class="summary-divider"></div>
+      <div class="summary-item"><span class="summary-value" id="summaryDostaw">5</span><span class="summary-label">Dostaw</span></div>
+    </div>
+    <div class="days-section" style="overflow-y:auto;flex:1;padding-bottom:100px">
+      <div class="days-grid" id="daysGrid"></div>
+      <div class="day-detail-header">
+        <div class="day-detail-title" id="detailTitle">Poniedziałek, 16 Lut</div>
+        <div class="day-detail-meta" id="detailMeta">🚛 3 dostawy</div>
+      </div>
+      <div class="baustelle-list" id="baustelleList"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════
+       SCREEN: RAPORTY
+  ══════════════════════════════ -->
+  <div class="screen" id="screen-raporty">
+    <div class="statusbar"><span>08:54</span><span>📶 🔋93</span></div>
+    <div class="header"><div class="header-title">Raporty i Eksport</div></div>
+    <div class="content">
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom:14px">Zakres dat</div>
+        <div class="date-pills">
+          <button class="date-pill active" onclick="setPill(this)">Bieżący miesiąc</button>
+          <button class="date-pill" onclick="setPill(this)">Poprzedni miesiąc</button>
+          <button class="date-pill" onclick="setPill(this)">Niestandardowy</button>
+        </div>
+        <div class="date-row">
+          <div class="date-field"><label>Od:</label><div class="date-input"><span>📅</span><span>01.02.2026</span></div></div>
+          <div class="date-field"><label>Do:</label><div class="date-input"><span>📅</span><span>28.02.2026</span></div></div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="workers-header">
+          <div class="section-title">Pracownicy</div>
+          <div class="worker-actions">
+            <button class="worker-action-btn select" onclick="selectAllChips()">Zaznacz wszystkich</button>
+            <button class="worker-action-btn clear" onclick="clearAllChips()">Wyczyść</button>
+          </div>
+        </div>
+        <div class="workers-sub">Wszyscy pracownicy (wybierz konkretnych jeśli potrzebujesz)</div>
+        <div class="worker-chips-r">
+          <div class="worker-chip-r selected" onclick="toggleChip(this)">Andi</div>
+          <div class="worker-chip-r selected" onclick="toggleChip(this)">Jacek</div>
+          <div class="worker-chip-r selected" onclick="toggleChip(this)">Leo</div>
+          <div class="worker-chip-r selected" onclick="toggleChip(this)">Michał</div>
+          <div class="worker-chip-r selected" onclick="toggleChip(this)">Sepp</div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom:14px">Opcje eksportu</div>
+        <div class="export-grid">
+          <div class="export-option active" onclick="selectExport(this)"><span class="export-icon">📊</span><span class="export-name">Excel (.xlsx)</span><span class="export-sub">Edytowalny</span></div>
+          <div class="export-option inactive" onclick="selectExport(this)"><span class="export-icon">📄</span><span class="export-name">PDF (.pdf)</span><span class="export-sub">Do druku</span></div>
+        </div>
+        <div class="notes-row" onclick="toggleCheckbox()">
+          <div class="checkbox" id="notesCheck"></div>
+          <span class="notes-label">Uwzględnij notatki</span>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom:14px">Podsumowanie statusów</div>
+        <div class="status-row"><span class="status-badge" style="background:var(--green-pale);color:var(--green)">Praca</span><span class="status-value">173h</span></div>
+        <div class="status-row"><span class="status-badge" style="background:var(--red-pale);color:var(--red)">Chorobowe</span><span class="status-value">0h</span></div>
+        <div class="status-row"><span class="status-badge" style="background:var(--blue-pale);color:var(--blue)">Urlop</span><span class="status-value">0h</span></div>
+        <div class="status-row"><span class="status-badge" style="background:var(--yellow-pale);color:var(--yellow)">FZA</span><span class="status-value">0h</span></div>
+      </div>
+
+      <button class="export-btn">⬇ Eksportuj raport</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════
+       FAB OVERLAY + MENU
+  ══════════════════════════════ -->
+  <div class="fab-overlay" id="fabOverlay" onclick="toggleFab()"></div>
+  <div class="fab-menu" id="fabMenu">
+    <button class="fab-option"><div class="fab-option-icon">👥</div>Wszyscy pracownicy</button>
+    <button class="fab-option"><div class="fab-option-icon">👤</div>Wybierz pracownika</button>
+  </div>
+
+  <!-- ══════════════════════════════
+       BOTTOM NAV
+  ══════════════════════════════ -->
+  <div class="bottom-nav">
+    <div class="nav-item active" id="nav-dashboard" onclick="goTo('dashboard')">
+      <span class="nav-icon">⊞</span>
+      <span class="nav-label">Dashboard</span>
+    </div>
+    <div class="nav-item" id="nav-baustellen" onclick="goTo('baustellen')">
+      <span class="nav-icon">🔧</span>
+      <span class="nav-label">Baustellen</span>
+    </div>
+    <button class="fab-main" id="fabMain" onclick="toggleFab()">+</button>
+    <div class="nav-item" id="nav-kalkulator" onclick="goTo('kalkulator')">
+      <span class="nav-icon">🔢</span>
+      <span class="nav-label">Kalkulator</span>
+    </div>
+    <div class="nav-item" id="nav-raporty" onclick="goTo('raporty')">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Raporty</span>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<script>
+/* ── NAVIGATION ── */
+function goTo(tab) {
+  // Hide all screens
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  const screenEl = document.getElementById('screen-' + tab);
+  const navEl = document.getElementById('nav-' + tab);
+
+  if (screenEl) screenEl.classList.add('active');
+  if (navEl) navEl.classList.add('active');
+
+  closeFab();
+}
+
+/* ── FAB ── */
+function toggleFab() {
+  const overlay = document.getElementById('fabOverlay');
+  const menu = document.getElementById('fabMenu');
+  const fab = document.getElementById('fabMain');
+  const isOpen = menu.classList.contains('open');
+  if (isOpen) { closeFab(); }
+  else {
+    overlay.classList.add('open');
+    menu.classList.add('open');
+    fab.classList.add('open');
+    fab.textContent = '×';
+  }
+}
+
+function closeFab() {
+  document.getElementById('fabOverlay').classList.remove('open');
+  document.getElementById('fabMenu').classList.remove('open');
+  const fab = document.getElementById('fabMain');
+  fab.classList.remove('open');
+  fab.textContent = '+';
+}
+
+/* ── BAUSTELLEN ── */
+const MONTHS_PL = ['Sty','Lut','Mar','Apr','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
+const DATA = {
+  '2026-02-16': [
+    { name: "McDonald's", status: 'aktywna', ton: 18.0, dostawy: 1, mixy: ['AC 11','AC 32'] },
+    { name: 'Autostrada A4', status: 'aktywna', ton: 12.5, dostawy: 2, mixy: ['SMA 16'] },
+  ],
+  '2026-02-17': [{ name: 'Park Śląski', status: 'aktywna', ton: 8.0, dostawy: 1, mixy: ['AC 8'] }],
+  '2026-02-18': [
+    { name: "McDonald's", status: 'aktywna', ton: 18.0, dostawy: 1, mixy: ['AC 11','AC 32'] },
+    { name: 'Galeria Katowicka', status: 'zakończona', ton: 5.5, dostawy: 1, mixy: ['AC 16'] },
+  ],
+  '2026-02-19': [],
+  '2026-02-20': [{ name: 'Autostrada A4', status: 'aktywna', ton: 24.0, dostawy: 3, mixy: ['SMA 16','SMA 11'] }],
+  '2026-02-21': [{ name: 'Rondo Siemianowice', status: 'aktywna', ton: 10.5, dostawy: 2, mixy: ['AC 11'] }],
+  '2026-02-22': [],
+};
+
+let currentWeekStart = new Date('2026-02-16');
+let selectedDate = '2026-02-16';
+
+function toKey(d) { return d.toISOString().split('T')[0]; }
+
+function renderWeek() {
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(currentWeekStart);
+    d.setDate(d.getDate() + i);
+    dates.push(d);
+  }
+  const grid = document.getElementById('daysGrid');
+  grid.innerHTML = '';
+  document.getElementById('weekLabel').textContent =
+    `${dates[0].getDate()} – ${dates[6].getDate()} ${MONTHS_PL[dates[6].getMonth()]} ${dates[6].getFullYear()}`;
+
+  let totalTon = 0, totalBudow = new Set(), totalDostaw = 0;
+  const dayNames = ['Pn','Wt','Śr','Cz','Pt','Sb','Nd'];
+
+  dates.forEach(date => {
+    const key = toKey(date);
+    const entries = DATA[key] || [];
+    entries.forEach(e => { totalTon += e.ton; totalBudow.add(e.name); totalDostaw += e.dostawy; });
+    const dayIdx = (date.getDay() + 6) % 7;
+    const chip = document.createElement('div');
+    chip.className = 'day-chip' + (entries.length > 0 ? ' has-data' : '') + (key === selectedDate ? ' active' : '');
+    chip.innerHTML = `<span class="day-name">${dayNames[dayIdx]}</span><span class="day-number">${date.getDate()}</span><span class="day-dot"></span>`;
+    chip.onclick = () => { selectedDate = key; renderWeek(); };
+    grid.appendChild(chip);
+  });
+
+  document.getElementById('summaryTon').textContent = totalTon.toFixed(1) + 't';
+  document.getElementById('summaryBudow').textContent = totalBudow.size;
+  document.getElementById('summaryDostaw').textContent = totalDostaw;
+  renderDetail();
+}
+
+function renderDetail() {
+  const entries = DATA[selectedDate] || [];
+  const date = new Date(selectedDate);
+  const dayIdx = (date.getDay() + 6) % 7;
+  const fullDays = ['Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota','Niedziela'];
+  document.getElementById('detailTitle').textContent = `${fullDays[dayIdx]}, ${date.getDate()} ${MONTHS_PL[date.getMonth()]}`;
+  const totalDostaw = entries.reduce((s, e) => s + e.dostawy, 0);
+  const totalTon = entries.reduce((s, e) => s + e.ton, 0);
+  document.getElementById('detailMeta').textContent = entries.length > 0 ? `🚛 ${totalDostaw} dostaw · ${totalTon.toFixed(1)}t` : 'Brak dostaw';
+  const list = document.getElementById('baustelleList');
+  list.innerHTML = '';
+  if (entries.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🏗️</div><div class="empty-text">Brak budów w tym dniu</div></div>`;
+    return;
+  }
+  entries.forEach(entry => {
+    const card = document.createElement('div');
+    card.className = 'baustelle-card' + (entry.status === 'zakończona' ? ' inactive' : '');
+    const statusClass = entry.status === 'aktywna' ? '' : 'inactive';
+    const statusLabel = entry.status === 'aktywna' ? 'AKTYWNA' : 'ZAKOŃCZONA';
+    const tags = entry.mixy.map(m => `<span class="tag">${m}</span>`).join('');
+    card.innerHTML = `<div class="card-top"><span class="card-status ${statusClass}">${statusLabel}</span><span class="card-arrow">›</span></div><div class="card-name">${entry.name}</div><div class="card-tags"><span class="tag orange">🚛 ${entry.ton}t</span><span class="tag orange">${entry.dostawy} dostaw</span>${tags}</div>`;
+    list.appendChild(card);
+  });
+}
+
+function changeWeek(dir) {
+  currentWeekStart.setDate(currentWeekStart.getDate() + dir * 7);
+  selectedDate = toKey(new Date(currentWeekStart));
+  renderWeek();
+}
+
+/* ── RAPORTY ── */
+function setPill(el) {
+  document.querySelectorAll('.date-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+}
+function toggleChip(el) { el.classList.toggle('selected'); }
+function selectAllChips() { document.querySelectorAll('.worker-chip-r').forEach(c => c.classList.add('selected')); }
+function clearAllChips() { document.querySelectorAll('.worker-chip-r').forEach(c => c.classList.remove('selected')); }
+function selectExport(el) {
+  document.querySelectorAll('.export-option').forEach(e => { e.classList.remove('active'); e.classList.add('inactive'); });
+  el.classList.remove('inactive'); el.classList.add('active');
+}
+function toggleCheckbox() {
+  const cb = document.getElementById('notesCheck');
+  cb.classList.toggle('checked');
+  cb.textContent = cb.classList.contains('checked') ? '✓' : '';
+}
+
+/* ── INIT ── */
+renderWeek();
+</script>
+</body>
+</html>

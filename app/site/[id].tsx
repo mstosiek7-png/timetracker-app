@@ -14,13 +14,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { theme } from '../../constants/theme';
 import { supabase } from '../../services/supabase';
 import { ConstructionSite } from '../../types/models';
+import { useBaustellen } from '../../hooks/useBaustellen';
 
 // Components
 import PageHeader from '../../components/ui/PageHeader';
@@ -48,9 +49,11 @@ interface DeliveryRow {
 
 export default function SiteDetailScreen() {
   const router = useRouter();
-  const { id: siteId } = useLocalSearchParams();
+  const { id: siteId, day } = useLocalSearchParams();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { deleteSite } = useBaustellen();
 
   // Fetch site details
   const { data: site, isLoading: siteLoading, error: siteError } = useQuery({
@@ -108,18 +111,6 @@ export default function SiteDetailScreen() {
     enabled: !!siteId,
   });
 
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('construction_sites')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-    },
-  });
-
   const handleDelete = () => {
     if (!siteId || typeof siteId !== 'string') {
       Alert.alert('Błąd', 'Nie można usunąć budowy - brak ID');
@@ -135,21 +126,23 @@ export default function SiteDetailScreen() {
           text: 'Usuń',
           style: 'destructive',
           onPress: () => {
-            deleteMutation.mutate(siteId, {
-              onSuccess: () => {
-                // Remove immediately from baustellen cache
-                queryClient.setQueryData(['baustellen'], (old: any[] | undefined) =>
-                  old ? old.filter((s: any) => s.id !== siteId) : old
-                );
-                queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
-                queryClient.invalidateQueries({ queryKey: ['site-statistics'] });
+            (async () => {
+              setIsDeleting(true);
+              try {
+                await deleteSite(siteId);
+                await queryClient.invalidateQueries({ queryKey: ['construction-site', siteId] });
+                await queryClient.invalidateQueries({ queryKey: ['site-summary', siteId] });
+                await queryClient.invalidateQueries({ queryKey: ['site-deliveries', siteId] });
+                await queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
+                Alert.alert('Sukces', 'Budowa zostala usunieta');
                 router.back();
-              },
-              onError: (error) => {
+              } catch (error) {
                 console.error('Błąd usuwania budowy:', error);
-                Alert.alert('Błąd', 'Nie udało się usunąć budowy');
-              },
-            });
+                Alert.alert('Błąd', error instanceof Error ? error.message : 'Nie udało się usunąć budowy');
+              } finally {
+                setIsDeleting(false);
+              }
+            })();
           },
         },
       ]
@@ -158,7 +151,8 @@ export default function SiteDetailScreen() {
 
   const handleAddDelivery = () => {
     if (siteId && typeof siteId === 'string') {
-      router.push(`/delivery/new?site_id=${siteId}`);
+      const dayParam = typeof day === 'string' ? `&day=${encodeURIComponent(day)}` : '';
+      router.push(`/delivery/new?site_id=${siteId}${dayParam}`);
     }
   };
 
@@ -233,10 +227,10 @@ export default function SiteDetailScreen() {
         </View>
         <TouchableOpacity
           onPress={handleDelete}
-          disabled={deleteMutation.isPending}
+          disabled={isDeleting}
           style={[styles.deleteButton]}
         >
-          {deleteMutation.isPending ? (
+          {isDeleting ? (
             <ActivityIndicator size="small" color={theme.colors.card} />
           ) : (
             <>
@@ -327,7 +321,7 @@ export default function SiteDetailScreen() {
                     {/* Tons Box */}
                     <View style={styles.tonsBox}>
                       <Text style={styles.tonsValue}>
-                        {delivery.tons.toFixed(1)}
+                        {Number(delivery.tons ?? 0).toFixed(1)}
                       </Text>
                       <Text style={styles.tonsUnit}>t</Text>
                     </View>

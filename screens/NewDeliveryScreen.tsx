@@ -141,6 +141,13 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
   }
 
   async function handleSave() {
+    const selectedDay = route.params?.day;
+    const now = new Date();
+    const dateValue = typeof selectedDay === 'string' && selectedDay.length >= 10
+      ? selectedDay
+      : now.toISOString().split('T')[0];
+    const timeValue = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+
     await addDelivery({
       siteId,
       asphaltClass,
@@ -148,8 +155,8 @@ export default function NewDeliveryScreen({ navigation, route }: Props) {
       waybill: waybill || undefined,
       supplier: supplier || undefined,
       photoUri: photoUri || undefined,
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
+      date: dateValue,
+      time: timeValue,
     });
     navigation.goBack();
   }

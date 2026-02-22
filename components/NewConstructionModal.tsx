@@ -13,11 +13,12 @@ import { useBaustellen } from '../hooks/useBaustellen';
 interface Props {
   visible: boolean;
   onClose: () => void;
+  siteDate?: string;
 }
 
 const DEFAULT_TYPES = ['AC 11 D S'];
 
-export default function NewConstructionModal({ visible, onClose }: Props) {
+export default function NewConstructionModal({ visible, onClose, siteDate }: Props) {
   const { createSite } = useBaustellen();
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -61,7 +62,11 @@ export default function NewConstructionModal({ visible, onClose }: Props) {
     }
     setSaving(true);
     try {
-      await createSite({ name: name.trim(), address: address.trim() || undefined });
+      await createSite({
+        name: name.trim(),
+        address: address.trim() || undefined,
+        siteDate,
+      });
       Alert.alert('Sukces', 'Budowa zostaĹ‚a dodana');
       handleClose();
     } catch (e: any) {

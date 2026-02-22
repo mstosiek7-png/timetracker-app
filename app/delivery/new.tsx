@@ -6,7 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import NewDeliveryScreen from '../../screens/NewDeliveryScreen';
 
 export default function NewDeliveryPage() {
-  const { site_id, site_name } = useLocalSearchParams<{ site_id: string; site_name?: string }>();
+  const { site_id, site_name, day } = useLocalSearchParams<{ site_id: string; site_name?: string; day?: string }>();
 
   const nav: any = {
     navigate: (screen: string, _params?: any) => {
@@ -19,7 +19,7 @@ export default function NewDeliveryPage() {
     goBack: () => router.back(),
   };
 
-  const route: any = { params: { siteId: site_id, siteName: site_name } };
+  const route: any = { params: { siteId: site_id, siteName: site_name, day } };
 
   return <NewDeliveryScreen navigation={nav} route={route} />;
 }

@@ -12,7 +12,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { AppHeader, Badge, Checkbox, BottomNav, PrimaryButton } from '../components/ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../theme';
-import { useReports, ReportStats } from '../hooks/useReports';
+import { useReports } from '../hooks/useReports';
 import { useWorkers } from '../hooks/useWorkers';
 
 type Props = { navigation: NativeStackNavigationProp<any> };
@@ -21,7 +21,7 @@ type ExportFormat = 'xlsx' | 'pdf';
 
 export default function ReportsScreen({ navigation }: Props) {
   const { workers } = useWorkers();
-  const { useReportStats, generateReport, shareExistingReport, savedReports } = useReports();
+  const { useReportStats, generateReport } = useReports();
 
   const [rangeMode, setRangeMode] = useState<RangeMode>('current');
   const [dateFrom, setDateFrom] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -71,37 +71,12 @@ export default function ReportsScreen({ navigation }: Props) {
     }
   }
 
-  async function handleShareReport(report: any) {
-    try {
-      await shareExistingReport(report);
-    } catch (error) {
-      Alert.alert('Błąd', 'Nie udało się udostępnić raportu: ' + (error as Error).message);
-    }
-  }
-
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.orange} />
       <AppHeader title="Raporty i Eksport" />
 
-      {/* Stats strip */}
-      <View style={styles.statsStrip}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.totalHours}h</Text>
-          <Text style={styles.statLabel}>Łącznie godzin</Text>
-        </View>
-        <View style={[styles.statItem, styles.statBorder]}>
-          <Text style={styles.statValue}>{stats.entryCount}</Text>
-          <Text style={styles.statLabel}>Wpisy</Text>
-        </View>
-        <View style={[styles.statItem, styles.statBorder]}>
-          <Text style={styles.statValue}>{stats.workerCount}</Text>
-          <Text style={styles.statLabel}>Pracownicy</Text>
-        </View>
-      </View>
-
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={{ height: Spacing.lg }} />
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
         {/* ─── Date range ────────────────────────────── */}
         <View style={styles.card}>
@@ -145,7 +120,7 @@ export default function ReportsScreen({ navigation }: Props) {
         <View style={styles.card}>
           <View style={styles.filterHeader}>
             <Text style={styles.cardTitle}>Pracownicy</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={styles.workerActions}>
               <TouchableOpacity onPress={() => setSelectedWorkers(workers.map(w => w.id))}>
                 <Text style={styles.filterAction}>Zaznacz wszystkich</Text>
               </TouchableOpacity>
@@ -216,40 +191,14 @@ export default function ReportsScreen({ navigation }: Props) {
         </View>
 
         {/* ─── Generate ──────────────────────────────── */}
-        <View style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+        <View style={styles.exportBtnWrap}>
           <PrimaryButton
-            label="📥 Generuj raport"
+            label="⬇ Eksportuj raport"
             onPress={handleGenerate}
             loading={loading}
             fullWidth size="lg"
           />
         </View>
-
-        {/* ─── Saved reports ─────────────────────────── */}
-        <View style={styles.card}>
-          <View style={styles.savedHeader}>
-            <Text style={styles.cardTitle}>Zapisane raporty</Text>
-            <TouchableOpacity><Text style={{ fontSize: 18 }}>🔄</Text></TouchableOpacity>
-          </View>
-          {savedReports.length === 0 ? (
-            <Text style={styles.emptyText}>Brak zapisanych raportów</Text>
-          ) : (
-            savedReports.map(r => (
-              <TouchableOpacity 
-                key={r.id} 
-                style={styles.savedReportItem}
-                onPress={() => handleShareReport(r)}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.savedReportName}>{r.name}</Text>
-                  <Text style={styles.savedReportDate}>{r.createdAt}</Text>
-                </View>
-                <Text style={{ fontSize: 20 }}>📤</Text>
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
-
         <View style={{ height: 24 }} />
       </ScrollView>
 
@@ -261,48 +210,44 @@ export default function ReportsScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.cream },
   scroll: { flex: 1 },
-  statsStrip: { flexDirection: 'row', backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.creamDark },
-  statItem: { flex: 1, alignItems: 'center', paddingVertical: Spacing.md },
-  statBorder: { borderLeftWidth: 1, borderLeftColor: Colors.creamDark },
-  statValue: { fontFamily: 'DMMono_700Bold', fontSize: FontSize.xl, color: Colors.orange },
-  statLabel: { fontSize: 9, fontFamily: FontFamily.semiBold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 2 },
+  scrollContent: { paddingTop: Spacing.lg, paddingBottom: 100 },
   card: {
     backgroundColor: Colors.white, borderRadius: Radius.md,
     marginHorizontal: Spacing.lg, marginBottom: Spacing.md,
     padding: Spacing.lg, ...Shadows.sm,
   },
-  cardTitle: { fontSize: FontSize.xs, fontFamily: FontFamily.semiBold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.md },
-  dateTabs: { flexDirection: 'row', gap: 6, marginBottom: Spacing.md },
+  cardTitle: { fontSize: 10, fontFamily: FontFamily.bold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 },
+  dateTabs: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   dateTab: {
-    flex: 1, paddingVertical: 9, paddingHorizontal: 4,
-    backgroundColor: Colors.cream, borderRadius: Radius.sm,
+    flex: 1, paddingVertical: 9, paddingHorizontal: 6,
+    backgroundColor: Colors.cream, borderRadius: 20,
     alignItems: 'center',
   },
-  dateTabActive: { backgroundColor: Colors.orange },
-  dateTabText: { fontSize: 11, fontFamily: FontFamily.semiBold, color: Colors.grayDark, textAlign: 'center' },
+  dateTabActive: { backgroundColor: Colors.orange, ...Shadows.sm, shadowColor: Colors.orange },
+  dateTabText: { fontSize: 12, fontFamily: FontFamily.bold, color: Colors.grayMid, textAlign: 'center' },
   dateTabTextActive: { color: '#fff' },
   dateRangeRow: { flexDirection: 'row', gap: 10 },
-  rangeLabel: { fontSize: FontSize.xs, fontFamily: FontFamily.semiBold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 4 },
+  rangeLabel: { fontSize: 10, fontFamily: FontFamily.bold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 },
   rangeBtn: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Colors.cream, borderRadius: Radius.sm,
-    borderWidth: 1.5, borderColor: Colors.creamDark,
+    backgroundColor: Colors.cream, borderRadius: 10,
     paddingVertical: 10, paddingHorizontal: 12,
   },
-  rangeBtnText: { fontSize: FontSize.base, fontFamily: FontFamily.semiBold, color: Colors.black },
-  filterHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  filterAction: { fontSize: FontSize.sm, fontFamily: FontFamily.semiBold, color: Colors.orange },
-  filterActionGray: { fontSize: FontSize.sm, fontFamily: FontFamily.semiBold, color: Colors.grayMid },
-  filterHint: { fontSize: FontSize.sm, color: Colors.grayMid, marginBottom: Spacing.sm },
+  rangeBtnText: { fontSize: 13, fontFamily: FontFamily.bold, color: Colors.black },
+  filterHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  workerActions: { flexDirection: 'row', gap: 10 },
+  filterAction: { fontSize: 11, fontFamily: FontFamily.bold, color: Colors.orange },
+  filterActionGray: { fontSize: 11, fontFamily: FontFamily.bold, color: Colors.grayMid },
+  filterHint: { fontSize: 11, color: Colors.grayMid, marginBottom: 12 },
   workerChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   workerFilterChip: {
-    paddingVertical: 6, paddingHorizontal: 14,
-    backgroundColor: Colors.creamDark, borderRadius: Radius.pill,
-    borderWidth: 1.5, borderColor: 'transparent',
+    paddingVertical: 7, paddingHorizontal: 14,
+    backgroundColor: Colors.white, borderRadius: 20,
+    borderWidth: 2, borderColor: Colors.orange,
   },
-  workerFilterChipActive: { backgroundColor: Colors.orangePale, borderColor: Colors.orange },
-  workerFilterText: { fontSize: FontSize.base, fontFamily: FontFamily.medium, color: Colors.grayDark },
-  workerFilterTextActive: { color: Colors.orange },
+  workerFilterChipActive: { backgroundColor: Colors.orange, borderColor: Colors.orange },
+  workerFilterText: { fontSize: 13, fontFamily: FontFamily.bold, color: Colors.orange },
+  workerFilterTextActive: { color: '#fff' },
   exportCards: { flexDirection: 'row', gap: 10, marginBottom: Spacing.md },
   exportCard: {
     flex: 1, padding: Spacing.lg, borderRadius: Radius.sm,
@@ -311,24 +256,17 @@ const styles = StyleSheet.create({
   },
   exportCardSelected: { backgroundColor: Colors.orange, borderColor: Colors.orange },
   exportIcon: { fontSize: 26 },
-  exportName: { fontSize: FontSize.base, fontFamily: FontFamily.bold, color: Colors.black },
+  exportName: { fontSize: 14, fontFamily: FontFamily.bold, color: Colors.black },
   exportNameSelected: { color: '#fff' },
-  exportHint: { fontSize: FontSize.xs, color: Colors.grayMid },
+  exportHint: { fontSize: 11, color: Colors.grayMid },
   exportHintSelected: { color: 'rgba(255,255,255,0.8)' },
   notesRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  notesLabel: { fontSize: FontSize.md, fontFamily: FontFamily.medium, color: Colors.black },
+  notesLabel: { fontSize: 14, fontFamily: FontFamily.bold, color: Colors.black },
   statusSummaryRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: Colors.cream,
+    paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.cream,
   },
-  statusHours: { fontFamily: 'DMMono_500Medium', fontSize: FontSize.md, fontWeight: '700', color: Colors.black },
+  statusHours: { fontFamily: 'DMMono_500Medium', fontSize: 17, fontWeight: '900', color: Colors.black },
   statusHoursZero: { color: Colors.grayMid },
-  savedHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  emptyText: { fontSize: FontSize.base, color: Colors.grayMid, fontStyle: 'italic', textAlign: 'center', paddingVertical: Spacing.md },
-  savedReportItem: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.cream,
-  },
-  savedReportName: { fontSize: FontSize.base, fontFamily: FontFamily.semiBold, color: Colors.black },
-  savedReportDate: { fontSize: FontSize.sm, color: Colors.grayMid },
+  exportBtnWrap: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.md },
 });

@@ -172,6 +172,7 @@ export function useBaustellen() {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['baustellen'] });
+      queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
       queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
       queryClient.invalidateQueries({ queryKey: ['site-deliveries', variables.siteId] });
       queryClient.invalidateQueries({ queryKey: ['site-summary', variables.siteId] });
@@ -182,14 +183,25 @@ export function useBaustellen() {
 
   // ─── Create site ──────────────────────────────────────────
   const createSiteMutation = useMutation({
-    mutationFn: async (payload: { name: string; address?: string }) => {
+    mutationFn: async (payload: { name: string; address?: string; siteDate?: string }) => {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const siteDate = payload.siteDate ?? `${yyyy}-${mm}-${dd}`;
+
       const { error } = await supabase
         .from('construction_sites')
-        .insert({ name: payload.name, address: payload.address ?? null });
+        .insert({
+          name: payload.name,
+          address: payload.address ?? null,
+          site_date: siteDate,
+        });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['baustellen'] });
+      queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
       queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
     },
   });
@@ -198,13 +210,14 @@ export function useBaustellen() {
   const deleteSiteMutation = useMutation({
     mutationFn: async (id: string) => {
       console.log('Deleting site:', id);
-      const { error } = await supabase
-        .from('construction_sites')
-        .delete()
-        .eq('id', id);
+      const { data: deleted, error } = await supabase
+        .rpc('delete_construction_site', { p_site_id: id });
       if (error) {
         console.error('Delete error:', error);
         throw error;
+      }
+      if (!deleted) {
+        throw new Error('Nie udalo sie usunac budowy (brak uprawnien lub rekord nie istnieje).');
       }
       console.log('Delete successful');
       return id; // Return ID for onSuccess
@@ -216,6 +229,8 @@ export function useBaustellen() {
         if (!oldData) return oldData;
         return oldData.filter(s => s.id !== id);
       });
+      queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
+      queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
     },
   });
 

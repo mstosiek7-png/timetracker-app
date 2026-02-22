@@ -1,0 +1,62 @@
+Mam aplikację React Native z Expo. W pliku `app-mockup.html` (w folderze projektu) masz mockup 3 ekranów: Dashboard, Baustellen, Raporty. Przepisz TYLKO wygląd (UI/styling) tych 3 ekranów zgodnie z mockupem.
+
+Zasady:
+- Nie zmieniaj logiki biznesowej ani funkcji
+- Nie zmieniaj nawigacji
+- Nie ruszaj innych ekranów
+- Zachowaj wszystkie istniejące przyciski i ich handlery — tylko zmień ich wygląd
+- Jeśli w mockupie jest nowy element którego nie ma w aplikacji — zapytaj mnie zanim go dodasz
+- Zmieniaj jeden ekran na raz i pokaż mi wynik przed przejściem do następnego
+
+════════════════════════════════════════
+FAB — FUNKCJE PRZYCISKÓW
+════════════════════════════════════════
+
+DASHBOARD — po kliknięciu FAB (pomarańczowy + na dole) otwiera się menu jako lista z trzema opcjami:
+- "Dodaj wpis" — podłącz do istniejącej funkcji dodawania wpisu
+- "Wszyscy" — podłącz do istniejącej funkcji wyświetlania wszystkich pracowników
+- "Dodaj pracownika" — podłącz do istniejącej funkcji dodawania pracownika
+
+BAUSTELLEN (Lista Budów) — po kliknięciu FAB otwiera istniejący formularz dodawania nowej budowy. Podłącz do istniejącej funkcji.
+
+════════════════════════════════════════
+BAUSTELLEN — WIDOK TYGODNIOWY (NOWY KOMPONENT)
+════════════════════════════════════════
+
+Ten widok kalendarza to nowy komponent do zbudowania od zera w osobnym pliku.
+Podłącz go do istniejącej nawigacji w ekranie Baustellen.
+
+Struktura bazy Supabase:
+- construction_sites — budowy (id, name, status: 'active'/'completed')
+- deliveries — dostawy (id, site_id, tons, delivery_time, asphalt_type_id)
+- asphalt_types — typy asfaltu (id, site_id, name)
+
+Co ma robić widok tygodniowy:
+- Pobrać wszystkie construction_sites i powiązane deliveries z bieżącego tygodnia (filtruj po delivery_time)
+- Wyświetlić 7 kafelków dni (Pn-Nd) z aktualnym tygodniem
+- Na każdym kafelku pokazać: łączne tony (SUM deliveries.tons), liczbę budów, kropkę jeśli są dane
+- Strzałki prev/next zmieniają tydzień i pobierają nowe dane z Supabase
+- Summary bar nad kafelkami: łączne tony tygodnia, liczba unikalnych budów, liczba dostaw
+- Po kliknięciu w kafelek dnia — pokazuje listę budów z tego dnia (karty z nazwą, tonami, typami asfaltu)
+- Po kliknięciu w kartę budowy — nawiguje do istniejącego ekranu szczegółów budowy przekazując site_id
+- FAB + w tym ekranie otwiera istniejący formularz dodawania nowej budowy
+
+Zapytanie do Supabase dla tygodnia:
+SELECT cs.id, cs.name, cs.status,
+       d.tons, d.delivery_time,
+       at.name as asphalt_name
+FROM construction_sites cs
+LEFT JOIN deliveries d ON d.site_id = cs.id
+  AND d.delivery_time >= [poczatek_tygodnia]
+  AND d.delivery_time < [koniec_tygodnia]
+LEFT JOIN asphalt_types at ON at.id = d.asphalt_type_id
+
+════════════════════════════════════════
+KOLEJNOSC PRACY
+════════════════════════════════════════
+
+1. Przeskanuj strukturę projektu
+2. Pokaż mi które pliki to obecne ekrany Dashboard, Baustellen, Raporty — zanim cokolwiek zmienisz
+3. Zacznij od Dashboard
+4. Po każdym ekranie poczekaj na moje zatwierdzenie
+5. Baustellen rób jako ostatni — najpierw przepisz wygląd, potem dodaj nowy komponent tygodniowy
