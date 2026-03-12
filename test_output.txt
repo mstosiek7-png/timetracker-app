@@ -1,0 +1,122 @@
+﻿
+> timetracker-mobile@1.0.0 test C:\Users\mstos\Desktop\projekty\timetracker-project\timetracker-mobile
+> jest "--verbose"
+
+node.exe : PASS __test
+s__/calculator.test.ts
+At C:\Users\mstos\AppD
+ata\Roaming\npm\pnpm.p
+s1:24 char:5
++     & "node$exe"  "$
+basedir/node_modules/p
+npm/bin/pnpm.cjs" $arg
+s
++     ~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (PASS __tes   
+ ts__/calculator.t    
+est.ts:String) []    ,
+ RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+  Calculator Logic
+    ÔłÜ powinien popra
+wnie liczy─ç wynik baz
+owy (9 ms)
+    ÔłÜ powinien popra
+wnie nak┼éada─ç naddat
+ek (1 ms)
+    ÔłÜ powinien obs┼é
+ugiwa─ç brzegowe warto
+┼Ťci (1 ms)
+
+PASS __tests__/service
+s/supabase.test.ts
+  Supabase Service
+    ÔłÜ powinien mie─ç
+ zdefiniowane kluczowe
+ metody (9 ms)
+    ÔłÜ powinien spraw
+dza─ç zmienne ┼Ťrodowi
+skowe (1 ms)
+
+PASS __tests__/integra
+tion.test.ts
+  System Integration F
+low
+    ÔłÜ powinien popra
+wnie zarz─ůdza─ç list─
+ů pracownik├│w (8 ms)
+    ÔłÜ powinien popra
+wnie zapisywa─ç i agre
+gowa─ç czas pracy (1 m
+s)
+    ÔłÜ powinien popra
+wnie obs┼éugiwa─ç aktu
+alizacj─Ö wpisu (upser
+t)
+
+PASS __tests__/utils.t
+est.ts
+  Utility Functions
+    Date Utils
+      ÔłÜ formatDate p
+owinien zwraca─ç popra
+wny format polski (7 m
+s)
+      ÔłÜ formatDateSh
+ort powinien zwraca─ç 
+kr├│tki format
+      ÔłÜ getMonthStar
+t powinien zwraca─ç pi
+erwszy dzie┼ä miesi─ůc
+a
+      ÔłÜ isWeekendDay
+ powinien wykrywa─ç we
+ekendy
+    Formatting Utils
+      ÔłÜ formatHours 
+powinien poprawnie for
+matowa─ç godziny
+      ÔłÜ getInitials 
+powinien generowa─ç po
+prawne inicja┼éy
+      ÔłÜ pluralize po
+winien obs┼éugiwa─ç po
+lsk─ů gramatyk─Ö (1 ms
+)
+    Validation Utils
+      ÔłÜ validateEmpl
+oyee powinien wykrywa─
+ç b┼é─Ödy w danych pra
+cownika
+      ÔłÜ validateTime
+Entry powinien walidow
+a─ç wpisy czasu (1 ms)
+
+PASS __tests__/export_
+construction.test.ts
+  Construction Export 
+Service
+    ÔłÜ generateConstr
+uctionExcelReport shou
+ld process data correc
+tly (18 ms)
+    ÔłÜ generateConstr
+uctionPdfReport should
+ process data correctl
+y (1 ms)
+
+Test Suites: 5 passed,
+ 5 total
+Tests:       19 passed
+, 19 total
+Snapshots:   0 total
+Time:        2.478 s
+Ran all test suites.

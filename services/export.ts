@@ -64,6 +64,22 @@ export interface ConstructionReportData {
   supplier: string;
 }
 
+export interface WeeklyConstructionData {
+  siteId: string;
+  siteName: string;
+  siteAddress: string;
+  deliveries: {
+    [date: string]: {
+      asphaltTypes: {
+        name: string;
+        sumTons: number;
+      }[];
+      suppliers: Set<string>;
+      waybills: Set<string>;
+    }
+  };
+}
+
 function getLocale(language: Language) {
   return language === 'de' ? de : pl;
 }
@@ -684,6 +700,238 @@ export async function shareReport(fileUri: string, language: Language = 'pl'): P
     UTI: fileUri.endsWith('.pdf') ? 'com.adobe.pdf' : 'org.openxmlformats.spreadsheetml.sheet'
   });
   console.log('Share result:', result);
+}
+
+/**
+ * Generuje tygodniowy raport budowy (Tagesrapport) w układzie poziomym
+ * UKŁAD: Wiersze = dane budowy, Kolumny = dni (Pon-Pią)
+ */
+export async function generateWeeklyConstructionReport(
+  weekStart: Date,
+  weekEnd: Date,
+  language: Language = 'pl'
+): Promise<string> {
+  try {
+    const t = createTranslator(language);
+    const dateLocale = getLocale(language);
+
+    // 1. Pobierz dane z Supabase
+    // Używamy joinów według specyfikacji użytkownika
+    const { data: rawData, error } = await supabase
+      .from('deliveries')
+      .select(`
+        tons,
+        supplier,
+        lieferschein_nr,
+        delivery_time,
+        construction_sites (
+          id,
+          name,
+          address
+        ),
+        asphalt_types (
+          name
+        )
+      `)
+      .gte('delivery_time', weekStart.toISOString())
+      .lte('delivery_time', weekEnd.toISOString());
+
+    if (error) throw error;
+
+    // 2. Przetwórz i pogrupuj dane
+    // Grupowanie: Budowa -> Dzień -> Asfalt
+    const sitesMap = new Map<string, WeeklyConstructionData>();
+
+    (rawData || []).forEach((d: any) => {
+      const site = Array.isArray(d.construction_sites) ? d.construction_sites[0] : d.construction_sites;
+      const asphalt = Array.isArray(d.asphalt_types) ? d.asphalt_types[0] : d.asphalt_types;
+      
+      if (!site) return;
+
+      if (!sitesMap.has(site.id)) {
+        sitesMap.set(site.id, {
+          siteId: site.id,
+          siteName: site.name,
+          siteAddress: site.address || '-',
+          deliveries: {}
+        });
+      }
+
+      const siteData = sitesMap.get(site.id)!;
+      const dateKey = format(new Date(d.delivery_time), 'yyyy-MM-dd');
+
+      if (!siteData.deliveries[dateKey]) {
+        siteData.deliveries[dateKey] = {
+          asphaltTypes: [],
+          suppliers: new Set<string>(),
+          waybills: new Set<string>()
+        };
+      }
+
+      const dayData = siteData.deliveries[dateKey];
+      const asphaltName = asphalt?.name || t('Nieznany');
+      
+      const existingAsphalt = dayData.asphaltTypes.find(a => a.name === asphaltName);
+      if (existingAsphalt) {
+        existingAsphalt.sumTons += Number(d.tons);
+      } else {
+        dayData.asphaltTypes.push({ name: asphaltName, sumTons: Number(d.tons) });
+      }
+      
+      if (d.supplier) dayData.suppliers.add(d.supplier);
+      if (d.lieferschein_nr) dayData.waybills.add(d.lieferschein_nr);
+    });
+
+    // 3. Przygotuj Workbook ExcelJS
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(t('Tagesrapport'));
+
+    // Formaty dni (Pon-Pią)
+    const days: Date[] = [];
+    let curr = new Date(weekStart);
+    // Standardowo 5 dni roboczych według opisu A-F
+    for (let i = 0; i < 5; i++) {
+      days.push(new Date(curr));
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    // Styles
+    const borderThin: Partial<ExcelJS.Borders> = {
+      top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+      left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+      bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+      right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+    };
+
+    // Column widths
+    worksheet.getColumn(1).width = 15; // Kolumna A
+    for (let i = 2; i <= 6; i++) {
+        worksheet.getColumn(i).width = 22; // B-F
+    }
+
+    // A1:F1 Header
+    const weekNum = format(weekStart, 'w');
+    const year = format(weekStart, 'yyyy');
+    const titleRow = worksheet.addRow([`TAGESRAPPORT KW ${weekNum} / ${year}`]);
+    worksheet.mergeCells(1, 1, 1, 6);
+    titleRow.getCell(1).style = {
+      font: { bold: true, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E2E2E' } },
+      alignment: { horizontal: 'center', vertical: 'middle' }
+    };
+    titleRow.height = 25;
+
+    // Row 2: Dates
+    const dateLabels = ['', ...days.map(d => format(d, 'dd.MM.yyyy'))];
+    const dateRow = worksheet.addRow(dateLabels);
+    dateRow.eachCell((cell, colNum) => {
+      if (colNum > 1) {
+        cell.style = {
+          font: { bold: true, color: { argb: 'FFFFFFFF' } },
+          fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6A8F3C' } },
+          alignment: { horizontal: 'center' },
+          border: borderThin
+        };
+      }
+    });
+
+    // 4. Renderuj tabelę horyzontalną (jeden blok na cały tydzień)
+    const buildRow = (label: string, getter: (day: Date) => string, style?: Partial<ExcelJS.Style>) => {
+      const row = worksheet.addRow([label]);
+      row.getCell(1).style = {
+        font: { bold: true },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0EDE8' } },
+        border: borderThin
+      };
+
+      days.forEach((day, idx) => {
+        const val = getter(day);
+        const cell = row.getCell(idx + 2);
+        cell.value = val;
+        cell.style = { 
+          border: borderThin,
+          alignment: { wrapText: true, vertical: 'middle', horizontal: 'center' },
+          ...style
+        };
+      });
+      return row;
+    };
+
+    // Funkcja pomocnicza do pobierania wszystkich wpisów danego dnia (wszystkie budowy)
+    const getFlattenedDayData = (day: Date) => {
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const results: { siteName: string; siteAddress: string; asphaltName: string; tons: string; supplier: string; waybill: string }[] = [];
+      
+      sitesMap.forEach(site => {
+        const d = site.deliveries[dateKey];
+        if (d) {
+          d.asphaltTypes.forEach(at => {
+            results.push({
+              siteName: site.siteName,
+              siteAddress: site.siteAddress,
+              asphaltName: at.name,
+              tons: at.sumTons.toFixed(2),
+              supplier: Array.from(d.suppliers).join(', '),
+              waybill: Array.from(d.waybills).join(', ')
+            });
+          });
+        }
+      });
+      return results;
+    };
+
+    // Nr budowy
+    buildRow(t('Nr budowy'), (day) => {
+      return getFlattenedDayData(day).map(r => r.siteName).join('\n');
+    });
+    // Adres
+    buildRow(t('Adres'), (day) => {
+      return getFlattenedDayData(day).map(r => r.siteAddress).join('\n');
+    });
+    // Klasa asfaltu
+    buildRow(t('Klasa asfaltu'), (day) => {
+      return getFlattenedDayData(day).map(r => r.asphaltName).join('\n');
+    });
+    // Ilość [to]
+    buildRow(t('Ilosc [to]'), (day) => {
+      return getFlattenedDayData(day).map(r => r.tons).join('\n');
+    }, { font: { bold: true } });
+    // Dostawca
+    buildRow(t('Dostawca'), (day) => {
+      return getFlattenedDayData(day).map(r => r.supplier).join('\n');
+    });
+    // LS nr
+    buildRow(t('LS nr'), (day) => {
+      return getFlattenedDayData(day).map(r => r.waybill).join('\n');
+    });
+    // Notatki
+    const notesRow = buildRow(t('Notatki'), () => '', { 
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBF5' } } 
+    });
+    notesRow.getCell(1).style = {
+      font: { bold: true },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBF5' } },
+      border: borderThin
+    };
+
+    // Poprawka koloru nagłówka na Orange (#E8631A) zgodnie z mockupem
+    titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8631A' } };
+
+    // Finalizacja pliku
+    const buffer = await workbook.xlsx.writeBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
+    const fileName = `tagesrapport_KW${weekNum}_${year}.xlsx`;
+    const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+
+    await FileSystem.writeAsStringAsync(fileUri, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    return fileUri;
+  } catch (error) {
+    console.error('Błąd generowania raportu tygodniowego budowy:', error);
+    throw error;
+  }
 }
 
 /**

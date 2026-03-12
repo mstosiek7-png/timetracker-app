@@ -17,6 +17,7 @@ import {
   generatePdfReport, 
   generateConstructionExcelReport,
   generateConstructionPdfReport,
+  generateWeeklyConstructionReport,
   shareReport,
   ExportOptions,
   ExportConstructionOptions
@@ -160,7 +161,7 @@ export function useReports() {
     workerIds?: string[];
     format: 'xlsx' | 'pdf';
     includeNotes: boolean;
-    reportType?: 'employees' | 'construction';
+    reportType?: 'employees' | 'construction' | 'construction_weekly';
     siteIds?: string[];
   }): Promise<void> {
     try {
@@ -181,6 +182,16 @@ export function useReports() {
           fileUri = await generateExcelReport(exportOptions);
         } else {
           fileUri = await generatePdfReport(exportOptions);
+        }
+      } else if (reportType === 'construction_weekly') {
+        if (fmt === 'xlsx') {
+          fileUri = await generateWeeklyConstructionReport(
+            dateFrom,
+            dateTo,
+            language
+          );
+        } else {
+          throw new Error('PDF format is not yet supported for Tagesrapport');
         }
       } else {
         const constructionOptions: ExportConstructionOptions = {

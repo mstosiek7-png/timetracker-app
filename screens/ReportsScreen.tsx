@@ -34,7 +34,7 @@ export default function ReportsScreen({ navigation }: Props) {
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker]     = useState(false);
   const [loading, setLoading] = useState(false);
-  const [reportType, setReportType] = useState<'employees' | 'construction'>('employees');
+  const [reportType, setReportType] = useState<'employees' | 'construction' | 'construction_weekly'>('employees');
 
   function setRange(mode: RangeMode) {
     setRangeMode(mode);
@@ -103,6 +103,14 @@ export default function ReportsScreen({ navigation }: Props) {
             >
               <Text style={[styles.reportTypeBtnText, reportType === 'construction' && styles.reportTypeBtnTextActive]}>
                 {t('Zestawienie budów')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.reportTypeBtn, reportType === 'construction_weekly' && styles.reportTypeBtnActive]}
+              onPress={() => setReportType('construction_weekly')}
+            >
+              <Text style={[styles.reportTypeBtnText, reportType === 'construction_weekly' && styles.reportTypeBtnTextActive]}>
+                {t('Tagesrapport')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -204,9 +212,9 @@ export default function ReportsScreen({ navigation }: Props) {
             <Checkbox checked={includeNotes} onToggle={() => setIncludeNotes(v => !v)} />
             <Text style={styles.notesLabel}>{t('Uwzglednij notatki')}</Text>
           </TouchableOpacity>
-          {reportType === 'construction' && (
+          {(reportType === 'construction' || reportType === 'construction_weekly') && (
             <Text style={{ fontSize: 11, color: Colors.orange, fontFamily: FontFamily.bold, marginTop: 10 }}>
-              * {t('Zestawienie budów')}
+              * {reportType === 'construction_weekly' ? t('Tagesrapport - eksport tylko w Excelu') : t('Zestawienie budów')}
             </Text>
           )}
         </View>
@@ -338,7 +346,7 @@ const styles = StyleSheet.create({
   statusHours: { fontFamily: 'DMMono_500Medium', fontSize: 17, fontWeight: '900', color: Colors.black },
   statusHoursZero: { color: Colors.grayMid },
   exportBtnWrap: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.md },
-  reportTypeRow: { flexDirection: 'row', gap: 8 },
+  reportTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   reportTypeBtn: {
     flex: 1, paddingVertical: 10, alignItems: 'center',
     backgroundColor: Colors.cream, borderRadius: 10,

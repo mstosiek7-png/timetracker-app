@@ -1,0 +1,82 @@
+﻿git : remote: error: GH013: R
+epository rule violations fou
+nd for refs/heads/nowy-ui.   
+     
+At line:1 char:1
++ git push origin nowy-ui > p
+ush_error.txt 2>&1 ; cat push
+_error.txt
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (remote:  
+   error: ...owy-ui.         
+   :String) [], RemoteExc    
+eption
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+remote: 
+remote: - GITHUB PUSH PROTECT
+ION        
+remote:   ÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔ
+ÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇö
+ÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇ
+öÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔ
+ÇöÔÇöÔÇöÔÇöÔÇöÔÇö        
+remote:     Resolve the follo
+wing violations before pushin
+g again        
+remote: 
+remote:     - Push cannot con
+tain secrets        
+remote: 
+remote:             
+remote:      (?) Learn how to
+ resolve a blocked push      
+  
+remote:      https://docs.git
+hub.com/code-security/secret-
+scanning/working-with-secret-
+scanning-and-push-protection/
+working-with-push-protection-
+from-the-command-line#resolvi
+ng-a-blocked-push        
+remote:             
+remote:             
+remote:       ÔÇöÔÇö Figma Pe
+rsonal Access Token ÔÇöÔÇöÔÇö
+ÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇ
+öÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔ
+Çö        
+remote:        locations:    
+    
+remote:          - commit: 58
+353ba9780d80a43ac2669c2145d46
+c6a743502        
+remote:            path: clin
+e_mcp_settings.json:38       
+ 
+remote:             
+remote:        (?) To push, r
+emove secret from commit(s) o
+r follow this URL to allow th
+e secret.        
+remote:        https://github
+.com/mstosiek7-png/timetracke
+r-app/security/secret-scannin
+g/unblock-secret/3AqQ4oeKgJNy
+u4NVmW89mCQTWqi        
+remote:             
+remote: 
+remote: 
+To https://github.com/mstosie
+k7-png/timetracker-app.git
+ ! [remote rejected] nowy-ui 
+-> nowy-ui (push declined due
+ to repository rule violation
+s)
+error: failed to push some re
+fs to 'https://github.com/mst
+osiek7-png/timetracker-app.gi
+t'
