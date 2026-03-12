@@ -733,22 +733,38 @@ export async function generateWeeklyConstructionReport(
           name
         )
       `)
-      .gte('delivery_time', weekStart.toISOString())
-      .lte('delivery_time', weekEnd.toISOString());
+      .gte('delivery_time', format(weekStart, "yyyy-MM-dd'T'00:00:00.000'Z'"))
+      .lte('delivery_time', format(weekEnd, "yyyy-MM-dd'T'23:59:59.999'Z'"));
 
     if (error) throw error;
-
     // 2. Przetwórz i pogrupuj dane
     // Grupowanie: Budowa -> Dzień -> Asfalt
-    const sitesMap = new Map<string, WeeklyConstructionData>();
+    interface WeeklyConstructionDataLocal {
+      siteId: string;
+      siteName: string;
+      siteAddress: string;
+      deliveries: Record<string, {
+        asphaltTypes: { name: string; sumTons: number }[];
+        suppliers: string[];
+        waybills: string[];
+      }>;
+    }
 
-    (rawData || []).forEach((d: any) => {
+    const sitesMap = new Map<string, WeeklyConstructionDataLocal>();
+
+    (rawData || []).forEach((d) => {
+      // Supabase returns foreign keys as objects, but TypeScript might think it's an array if multiple were possible.
+      // Force extraction to be sure.
       const site = Array.isArray(d.construction_sites) ? d.construction_sites[0] : d.construction_sites;
       const asphalt = Array.isArray(d.asphalt_types) ? d.asphalt_types[0] : d.asphalt_types;
       
-      if (!site) return;
+      if (!site) {
+        console.warn(`[Tagesrapport] Missing site for delivery matching waybill ${d.lieferschein_nr}`);
+        return;
+      }
 
       if (!sitesMap.has(site.id)) {
+        console.log(`[Tagesrapport] Adding site: ${site.name} (${site.id})`);
         sitesMap.set(site.id, {
           siteId: site.id,
           siteName: site.name,
@@ -763,8 +779,8 @@ export async function generateWeeklyConstructionReport(
       if (!siteData.deliveries[dateKey]) {
         siteData.deliveries[dateKey] = {
           asphaltTypes: [],
-          suppliers: new Set<string>(),
-          waybills: new Set<string>()
+          suppliers: [],
+          waybills: []
         };
       }
 
@@ -778,19 +794,31 @@ export async function generateWeeklyConstructionReport(
         dayData.asphaltTypes.push({ name: asphaltName, sumTons: Number(d.tons) });
       }
       
-      if (d.supplier) dayData.suppliers.add(d.supplier);
-      if (d.lieferschein_nr) dayData.waybills.add(d.lieferschein_nr);
+      if (d.supplier && !dayData.suppliers.includes(d.supplier)) {
+        dayData.suppliers.push(d.supplier);
+      }
+      if (d.lieferschein_nr && !dayData.waybills.includes(d.lieferschein_nr)) {
+        dayData.waybills.push(d.lieferschein_nr);
+      }
     });
+
+    console.log(`[Tagesrapport] Processing completed. Sites with data: ${sitesMap.size}`);
+    if (sitesMap.size === 0) {
+      console.warn('[Tagesrapport] NO SITES FOUND. Check if delivery_time matches the selected week.');
+    }
 
     // 3. Przygotuj Workbook ExcelJS
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet(t('Tagesrapport'));
 
-    // Formaty dni (Pon-Pią)
+    // Formaty dni (Dynamiczne na podstawie wybranego zakresu od-do)
     const days: Date[] = [];
     let curr = new Date(weekStart);
-    // Standardowo 5 dni roboczych według opisu A-F
-    for (let i = 0; i < 5; i++) {
+    curr.setHours(0, 0, 0, 0);
+    const end = new Date(weekEnd);
+    end.setHours(23, 59, 59, 999);
+    
+    while (curr <= end) {
       days.push(new Date(curr));
       curr.setDate(curr.getDate() + 1);
     }
@@ -805,15 +833,22 @@ export async function generateWeeklyConstructionReport(
 
     // Column widths
     worksheet.getColumn(1).width = 15; // Kolumna A
-    for (let i = 2; i <= 6; i++) {
-        worksheet.getColumn(i).width = 22; // B-F
+    for (let i = 2; i <= days.length + 1; i++) {
+        worksheet.getColumn(i).width = 22; // Kolumny dni
     }
 
-    // A1:F1 Header
+    // A1:Ostatnia Header
     const weekNum = format(weekStart, 'w');
     const year = format(weekStart, 'yyyy');
-    const titleRow = worksheet.addRow([`TAGESRAPPORT KW ${weekNum} / ${year}`]);
-    worksheet.mergeCells(1, 1, 1, 6);
+    
+    // Tytuł w nagłówku
+    let titleText = `RAPORT OD ${format(weekStart, 'dd.MM')} DO ${format(weekEnd, 'dd.MM.yyyy')}`;
+    if (days.length <= 7) {
+       titleText = `TAGESRAPPORT KW ${weekNum} / ${year}`;
+    }
+    
+    const titleRow = worksheet.addRow([titleText]);
+    worksheet.mergeCells(1, 1, 1, days.length + 1);
     titleRow.getCell(1).style = {
       font: { bold: true, color: { argb: 'FFFFFFFF' } },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E2E2E' } },
@@ -871,8 +906,8 @@ export async function generateWeeklyConstructionReport(
               siteAddress: site.siteAddress,
               asphaltName: at.name,
               tons: at.sumTons.toFixed(2),
-              supplier: Array.from(d.suppliers).join(', '),
-              waybill: Array.from(d.waybills).join(', ')
+              supplier: d.suppliers && d.suppliers.length > 0 ? d.suppliers.join(', ') : '-',
+              waybill: d.waybills && d.waybills.length > 0 ? d.waybills.join(', ') : '-'
             });
           });
         }
