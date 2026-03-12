@@ -22,7 +22,7 @@ type ExportFormat = 'xlsx' | 'pdf';
 
 export default function ReportsScreen({ navigation }: Props) {
   const { workers } = useWorkers();
-  const { generateReport, savedReports, shareExistingReport } = useReports();
+  const { generateReport, savedReports, shareExistingReport, deleteReport } = useReports();
   const { t } = useI18n();
 
   const [rangeMode, setRangeMode] = useState<RangeMode>('current');
@@ -34,6 +34,7 @@ export default function ReportsScreen({ navigation }: Props) {
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker]     = useState(false);
   const [loading, setLoading] = useState(false);
+  const [reportType, setReportType] = useState<'employees' | 'construction'>('employees');
 
   function setRange(mode: RangeMode) {
     setRangeMode(mode);
@@ -60,7 +61,14 @@ export default function ReportsScreen({ navigation }: Props) {
     try {
       // Jeśli selectedWorkers zawiera wszystkich pracowników, wyślij puste (oznacza: wszyscy)
       const workersToFilter = selectedWorkers.length === workers.length ? [] : selectedWorkers;
-      await generateReport({ dateFrom, dateTo, workerIds: workersToFilter, format: exportFormat, includeNotes });
+      await generateReport({ 
+        dateFrom, 
+        dateTo, 
+        workerIds: workersToFilter, 
+        format: exportFormat, 
+        includeNotes,
+        reportType
+      });
       // Success message removed - share dialog will appear automatically
     } catch (error) {
       console.error('Generate report error:', error);
@@ -76,6 +84,29 @@ export default function ReportsScreen({ navigation }: Props) {
       <AppHeader title={t('Raporty i Eksport')} />
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
+        {/* ─── Report Type ───────────────────────────── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t('Rodzaj raportu')}</Text>
+          <View style={styles.reportTypeRow}>
+            <TouchableOpacity 
+              style={[styles.reportTypeBtn, reportType === 'employees' && styles.reportTypeBtnActive]}
+              onPress={() => setReportType('employees')}
+            >
+              <Text style={[styles.reportTypeBtnText, reportType === 'employees' && styles.reportTypeBtnTextActive]}>
+                {t('Godziny pracowników')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.reportTypeBtn, reportType === 'construction' && styles.reportTypeBtnActive]}
+              onPress={() => setReportType('construction')}
+            >
+              <Text style={[styles.reportTypeBtnText, reportType === 'construction' && styles.reportTypeBtnTextActive]}>
+                {t('Zestawienie budów')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* ─── Date range ────────────────────────────── */}
         <View style={styles.card}>
@@ -116,35 +147,37 @@ export default function ReportsScreen({ navigation }: Props) {
         </View>
 
         {/* ─── Workers filter ────────────────────────── */}
-        <View style={styles.card}>
-          <View style={styles.filterHeader}>
-            <Text style={styles.cardTitle}>{t('Pracownicy')}</Text>
-            <View style={styles.workerActions}>
-              <TouchableOpacity onPress={() => setSelectedWorkers(workers.map(w => w.id))}>
-                <Text style={styles.filterAction}>{t('Zaznacz wszystkich')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setSelectedWorkers([])}>
-                <Text style={styles.filterActionGray}>{t('Wyczysc')}</Text>
-              </TouchableOpacity>
+        {reportType === 'employees' && (
+          <View style={styles.card}>
+            <View style={styles.filterHeader}>
+              <Text style={styles.cardTitle}>{t('Pracownicy')}</Text>
+              <View style={styles.workerActions}>
+                <TouchableOpacity onPress={() => setSelectedWorkers(workers.map(w => w.id))}>
+                  <Text style={styles.filterAction}>{t('Zaznacz wszystkich')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setSelectedWorkers([])}>
+                  <Text style={styles.filterActionGray}>{t('Wyczysc')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+              <Text style={styles.filterHint}>{t('Wszyscy pracownicy (wybierz konkretnych jesli potrzebujesz)')}</Text>
+            <View style={styles.workerChips}>
+              {workers.map(w => (
+                <TouchableOpacity
+                  key={w.id}
+                  style={[styles.workerFilterChip,
+                    (selectedWorkers.length === 0 || selectedWorkers.includes(w.id)) && styles.workerFilterChipActive]}
+                  onPress={() => toggleWorker(w.id)}
+                >
+                  <Text style={[styles.workerFilterText,
+                    (selectedWorkers.length === 0 || selectedWorkers.includes(w.id)) && styles.workerFilterTextActive]}>
+                    {w.firstName}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
-            <Text style={styles.filterHint}>{t('Wszyscy pracownicy (wybierz konkretnych jesli potrzebujesz)')}</Text>
-          <View style={styles.workerChips}>
-            {workers.map(w => (
-              <TouchableOpacity
-                key={w.id}
-                style={[styles.workerFilterChip,
-                  (selectedWorkers.length === 0 || selectedWorkers.includes(w.id)) && styles.workerFilterChipActive]}
-                onPress={() => toggleWorker(w.id)}
-              >
-                <Text style={[styles.workerFilterText,
-                  (selectedWorkers.length === 0 || selectedWorkers.includes(w.id)) && styles.workerFilterTextActive]}>
-                  {w.firstName}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        )}
 
         {/* ─── Export options ────────────────────────── */}
         <View style={styles.card}>
@@ -171,6 +204,11 @@ export default function ReportsScreen({ navigation }: Props) {
             <Checkbox checked={includeNotes} onToggle={() => setIncludeNotes(v => !v)} />
             <Text style={styles.notesLabel}>{t('Uwzglednij notatki')}</Text>
           </TouchableOpacity>
+          {reportType === 'construction' && (
+            <Text style={{ fontSize: 11, color: Colors.orange, fontFamily: FontFamily.bold, marginTop: 10 }}>
+              * {t('Zestawienie budów')}
+            </Text>
+          )}
         </View>
 
         {/* ─── Saved reports ─────────────────────────── */}
@@ -184,6 +222,20 @@ export default function ReportsScreen({ navigation }: Props) {
                 key={report.id}
                 style={styles.savedReportRow}
                 onPress={() => shareExistingReport(report)}
+                onLongPress={() => {
+                  Alert.alert(
+                    t('Usun raport'),
+                    `${t('Czy na pewno chcesz usunac raport')} "${report.name}"?`,
+                    [
+                      { text: t('Anuluj'), style: 'cancel' },
+                      { 
+                        text: t('Usun'), 
+                        style: 'destructive',
+                        onPress: () => deleteReport(report.id)
+                      },
+                    ]
+                  );
+                }}
               >
                 <View>
                   <Text style={styles.savedReportName}>{report.name}</Text>
@@ -286,4 +338,13 @@ const styles = StyleSheet.create({
   statusHours: { fontFamily: 'DMMono_500Medium', fontSize: 17, fontWeight: '900', color: Colors.black },
   statusHoursZero: { color: Colors.grayMid },
   exportBtnWrap: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.md },
+  reportTypeRow: { flexDirection: 'row', gap: 8 },
+  reportTypeBtn: {
+    flex: 1, paddingVertical: 10, alignItems: 'center',
+    backgroundColor: Colors.cream, borderRadius: 10,
+    borderWidth: 1, borderColor: Colors.creamDark,
+  },
+  reportTypeBtnActive: { backgroundColor: Colors.orange, borderColor: Colors.orange },
+  reportTypeBtnText: { fontSize: 13, fontFamily: FontFamily.bold, color: Colors.grayMid },
+  reportTypeBtnTextActive: { color: '#fff' },
 });

@@ -9,13 +9,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   documentDirectory,
   writeAsStringAsync,
+  deleteAsync,
   EncodingType,
 } from 'expo-file-system/legacy';
 import { 
   generateExcelReport, 
   generatePdfReport, 
+  generateConstructionExcelReport,
+  generateConstructionPdfReport,
   shareReport,
-  ExportOptions
+  ExportOptions,
+  ExportConstructionOptions
 } from '../services/export';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -148,33 +152,53 @@ export function useReports() {
     workerIds = [],
     format: fmt,
     includeNotes,
+    reportType = 'employees',
+    siteIds = [],
   }: {
     dateFrom: Date;
     dateTo: Date;
     workerIds?: string[];
     format: 'xlsx' | 'pdf';
     includeNotes: boolean;
+    reportType?: 'employees' | 'construction';
+    siteIds?: string[];
   }): Promise<void> {
     try {
-      // Prepare export options
-      const exportOptions: ExportOptions = {
-        startDate: dateFrom,
-        endDate: dateTo,
-        employeeIds: workerIds.length > 0 ? workerIds : undefined,
-        includeNotes,
-        format: fmt === 'xlsx' ? 'excel' : 'pdf',
-        language,
-      };
-
       // Generate the appropriate format
       let fileUri: string;
-      if (fmt === 'xlsx') {
-        fileUri = await generateExcelReport(exportOptions);
-        console.log('Excel report generated:', fileUri);
+
+      if (reportType === 'employees') {
+        const exportOptions: ExportOptions = {
+          startDate: dateFrom,
+          endDate: dateTo,
+          employeeIds: workerIds.length > 0 ? workerIds : undefined,
+          includeNotes,
+          format: fmt === 'xlsx' ? 'excel' : 'pdf',
+          language,
+        };
+
+        if (fmt === 'xlsx') {
+          fileUri = await generateExcelReport(exportOptions);
+        } else {
+          fileUri = await generatePdfReport(exportOptions);
+        }
       } else {
-        fileUri = await generatePdfReport(exportOptions);
-        console.log('PDF report generated:', fileUri);
+        const constructionOptions: ExportConstructionOptions = {
+          startDate: dateFrom,
+          endDate: dateTo,
+          siteIds: siteIds.length > 0 ? siteIds : undefined,
+          format: fmt === 'xlsx' ? 'excel' : 'pdf',
+          language,
+        };
+
+        if (fmt === 'xlsx') {
+          fileUri = await generateConstructionExcelReport(constructionOptions);
+        } else {
+          fileUri = await generateConstructionPdfReport(constructionOptions);
+        }
       }
+
+      console.log(`${reportType} ${fmt} report generated:`, fileUri);
 
       // Add to saved reports list first
       const fileName = fileUri.split('/').pop() || 'raport';
@@ -208,5 +232,19 @@ export function useReports() {
     }
   }
 
-  return { getStats, useReportStats, generateReport, shareExistingReport, savedReports };
+  // ─── deleteReport ─────────────────────────────────────────
+  async function deleteReport(reportId: string): Promise<void> {
+    try {
+      const report = savedReports.find(r => r.id === reportId);
+      if (report?.uri) {
+        await deleteAsync(report.uri, { idempotent: true });
+      }
+      setSavedReports(prev => prev.filter(r => r.id !== reportId));
+    } catch (error) {
+      console.error('Error deleting report:', error);
+      throw error;
+    }
+  }
+
+  return { getStats, useReportStats, generateReport, shareExistingReport, deleteReport, savedReports };
 }
