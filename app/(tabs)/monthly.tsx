@@ -97,7 +97,9 @@ export default function MonthlyViewScreen() {
     if (normalizedWorkerId && normalizedWorkerId !== selectedEmployeeId) {
       setSelectedEmployeeId(normalizedWorkerId);
     }
-  }, [normalizedWorkerId, selectedEmployeeId]);
+    // Only run when normalizedWorkerId changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedWorkerId]);
 
   useEffect(() => {
     return () => {
@@ -878,21 +880,24 @@ const styles = StyleSheet.create({
 
   // ── Calendar ──
   weekDays: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.xs,
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     marginBottom: theme.spacing.sm,
+     paddingHorizontal: 0,
   },
   weekDay: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
-    color: theme.colors.muted,
-    width: 40,
-    textAlign: 'center',
+     fontSize: theme.fontSize.sm,
+     fontWeight: '600',
+     color: theme.colors.muted,
+     width: 40,
+     textAlign: 'center',
+     marginHorizontal: 0,
   },
   calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+     justifyContent: 'space-between',
+     width: '100%',
   },
   dayCell: {
     width: 40,

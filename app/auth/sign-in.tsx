@@ -25,6 +25,7 @@ import { useI18n } from '../../i18n/I18nProvider';
 
 export default function SignInScreen() {
   const BIOMETRIC_KEY = 'timetracker:biometric-enabled';
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +35,18 @@ export default function SignInScreen() {
   const [biometricChecked, setBiometricChecked] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const { t } = useI18n();
+
+  // Sprawdzenie czy sesja wygasła
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        // Sprawdź czy aplikacja była uruchomiona, a sesja wygasła
+        setSessionExpired(true);
+      }
+    };
+    checkSession();
+  }, []);
 
   // Logowanie przez email i hasło
   const handleSignIn = async () => {
@@ -212,6 +225,11 @@ export default function SignInScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>TimeTracker</Text>
           <Text style={styles.subtitle}>{t('Zaloguj sie do konta')}</Text>
+          {sessionExpired && (
+            <Text style={{ color: theme.colors.error, marginTop: 8, fontWeight: 'bold' }}>
+              {t('Twoja sesja wygasła. Zaloguj się ponownie.')}
+            </Text>
+          )}
         </View>
 
         {/* Formularz logowania */}

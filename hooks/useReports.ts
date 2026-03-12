@@ -17,7 +17,6 @@ import {
   generatePdfReport, 
   generateConstructionExcelReport,
   generateConstructionPdfReport,
-  generateWeeklyConstructionReport,
   shareReport,
   ExportOptions,
   ExportConstructionOptions
@@ -100,8 +99,6 @@ export function useReports() {
   }
 
   // ─── getStats — sync version using last fetched data ─────
-  // Note: This is a simplified synchronous version for use with pre-fetched data.
-  // For reactive stats, use the useReportStats query below.
   function getStats({
     dateFrom,
     dateTo,
@@ -111,7 +108,6 @@ export function useReports() {
     dateTo: Date;
     workerIds?: string[];
   }): ReportStats {
-    // Returns placeholder until query resolves
     return { totalHours: 0, entryCount: 0, workerCount: 0, byStatus: { praca: 0, chorobowe: 0, urlop: 0, fza: 0 } };
   }
 
@@ -165,7 +161,6 @@ export function useReports() {
     siteIds?: string[];
   }): Promise<void> {
     try {
-      // Generate the appropriate format
       let fileUri: string;
 
       if (reportType === 'employees') {
@@ -183,17 +178,8 @@ export function useReports() {
         } else {
           fileUri = await generatePdfReport(exportOptions);
         }
-      } else if (reportType === 'construction_weekly') {
-        if (fmt === 'xlsx') {
-          fileUri = await generateWeeklyConstructionReport(
-            dateFrom,
-            dateTo,
-            language
-          );
-        } else {
-          throw new Error('PDF format is not yet supported for Tagesrapport');
-        }
       } else {
+        // Wszystkie raporty budów (dzienne, tygodniowe) obsługuje teraz ten sam zunifikowany eksport
         const constructionOptions: ExportConstructionOptions = {
           startDate: dateFrom,
           endDate: dateTo,
@@ -211,7 +197,6 @@ export function useReports() {
 
       console.log(`${reportType} ${fmt} report generated:`, fileUri);
 
-      // Add to saved reports list first
       const fileName = fileUri.split('/').pop() || 'raport';
       setSavedReports(prev => [
         { 
@@ -222,8 +207,6 @@ export function useReports() {
         },
         ...prev,
       ]);
-
-      // Report is saved; sharing is triggered manually from the list
     } catch (error) {
       console.error('Error generating report:', error);
       throw error;

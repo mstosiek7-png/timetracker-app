@@ -54,6 +54,7 @@ type DeliveryRow = {
 type SiteRow = {
   id: string;
   name: string;
+  address?: string | null;
   status: string | null;
   site_date?: string | null;
   deliveries?: DeliveryRow[] | null;
@@ -68,7 +69,7 @@ function useWeeklyData(weekStart: Date) {
     queryFn: async () => {
       const { data: sitesRaw, error: sitesError } = await supabase
         .from('construction_sites')
-        .select('id, name, status, site_date')
+        .select('id, name, address, status, site_date')
         .order('created_at', { ascending: false });
 
       if (sitesError) throw sitesError;
@@ -95,6 +96,7 @@ function useWeeklyData(weekStart: Date) {
       return (sitesRaw ?? []).map(site => ({
         id: site.id,
         name: site.name,
+        address: site.address ?? null,
         status: site.status,
         site_date: site.site_date,
         deliveries: deliveriesBySite[site.id] ?? [],
@@ -123,6 +125,8 @@ export default function WeeklyView({
   };
 
   const { data: sites = [] } = useWeeklyData(weekStart);
+  // Wyświetl wszystkie budowy z adresem
+  const allSitesWithAddress = sites.filter(site => site.address && site.address.trim() !== '');
 
   useEffect(() => {
     const today = new Date();
@@ -215,11 +219,19 @@ export default function WeeklyView({
   const selectedBucket = dayBuckets[selectedKey] ?? { deliveries: [] };
 
   const selectedSites = useMemo(() => {
-    const map: Record<string, { id: string; name: string; status: string | null; tons: number; asphaltTypes: string[] }> = {};
+    const map: Record<string, { id: string; name: string; address?: string | null; status: string | null; tons: number; asphaltTypes: string[] }> = {};
 
     selectedBucket.deliveries.forEach(d => {
+      const site = sites.find(s => s.id === d.siteId);
       if (!map[d.siteId]) {
-        map[d.siteId] = { id: d.siteId, name: d.siteName, status: d.status, tons: 0, asphaltTypes: [] };
+        map[d.siteId] = {
+          id: d.siteId,
+          name: d.siteName,
+          address: site?.address ?? undefined,
+          status: d.status,
+          tons: 0,
+          asphaltTypes: []
+        };
       }
       map[d.siteId].tons += d.tons;
       if (d.asphalt && !map[d.siteId].asphaltTypes.includes(d.asphalt)) {
@@ -230,7 +242,16 @@ export default function WeeklyView({
     sites.forEach(site => {
       if (site.site_date !== selectedKey) return;
       if (!map[site.id]) {
-        map[site.id] = { id: site.id, name: site.name, status: site.status, tons: 0, asphaltTypes: [] };
+        map[site.id] = {
+          id: site.id,
+          name: site.name,
+          address: site.address,
+          status: site.status,
+          tons: 0,
+          asphaltTypes: []
+        };
+      } else {
+        map[site.id].address = site.address;
       }
     });
 
@@ -343,6 +364,9 @@ export default function WeeklyView({
                   <Text style={styles.cardArrow}>›</Text>
                 </View>
                 <Text style={styles.siteName}>{site.name}</Text>
+                {site.address && (
+                  <Text style={styles.siteAddress}>{site.address}</Text>
+                )}
                 <View style={styles.siteTags}>
                   {(dayTonsBySite[site.id] ?? 0) > 0 && (
                     <View style={[styles.tag, styles.tagOrange]}>
@@ -367,6 +391,7 @@ export default function WeeklyView({
 }
 
 const styles = StyleSheet.create({
+    siteAddress: { fontSize: 13, fontFamily: FontFamily.regular, color: Colors.grayMid, marginBottom: 6 },
   container: { flex: 1, backgroundColor: Colors.cream },
   weekNav: {
     backgroundColor: Colors.orange,
@@ -412,14 +437,21 @@ const styles = StyleSheet.create({
   summaryDivider: { width: 1, alignSelf: 'stretch', backgroundColor: Colors.creamDark },
 
   scroll: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: 16, paddingBottom: 100 },
-  daysGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16, justifyContent: 'space-between' },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    marginBottom: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 0,
+  },
   dayChip: {
-    width: '13%',
-    minWidth: 42,
+    flex: 1,
+    minWidth: 0,
     backgroundColor: Colors.white,
     borderRadius: 14,
     paddingVertical: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -429,7 +461,15 @@ const styles = StyleSheet.create({
     borderColor: Colors.orange,
     ...Shadows.sm,
   },
-  dayName: { fontSize: 9, fontFamily: FontFamily.bold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.3 },
+  dayName: {
+    fontSize: 9,
+    fontFamily: FontFamily.bold,
+    color: Colors.grayMid,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    textAlign: 'center',
+    width: '100%',
+  },
   dayNameToday: { color: Colors.orange },
   dayNameActive: { color: 'rgba(255,255,255,0.75)' },
   dayNumber: { fontSize: 17, fontFamily: FontFamily.bold, color: Colors.black, lineHeight: 18 },
