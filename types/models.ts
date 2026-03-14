@@ -273,8 +273,8 @@ export interface EinsatzplanWithSite extends Einsatzplan {
 // OCR parsed day from Einsatzplan photo
 export interface EinsatzplanOcrDay {
   date: string;
-  baustelle: string;
-  adresse: string | null;
+  kostenstelle: string;   // numer budowy z pola Kostenstelle → do dopasowania
+  adresse: string | null; // adres z pola Baustelle
   mischgut: string | null;
   tonnen_plan: number | null;
   confidence: number;

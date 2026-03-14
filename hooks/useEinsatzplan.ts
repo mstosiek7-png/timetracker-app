@@ -30,7 +30,7 @@ export function useEinsatzplan(weekStart: Date) {
     queryKey: ['einsatzplan-week', startISO],
     queryFn: async () => {
       const net = await NetInfo.fetch();
-      if (!net.isConnected) {
+      if (net.isConnected === false) {
         // Offline: return cached data
         const cached = await AsyncStorage.getItem(weekCacheKey(weekStart));
         if (cached) return JSON.parse(cached) as EinsatzplanWithSite[];
@@ -67,7 +67,7 @@ export function useEinsatzplan(weekStart: Date) {
       const net = await NetInfo.fetch();
       const now = new Date().toISOString();
 
-      if (net.isConnected) {
+      if (net.isConnected !== false) {
         const { error } = await supabase
           .from('einsatzplan')
           .update({ tonnen_real, updated_at: now })

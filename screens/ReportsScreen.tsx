@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import NetInfo from '@react-native-community/netinfo';
 import { AppHeader, Badge, Checkbox, BottomNav, PrimaryButton } from '../components/ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../theme';
 import { useReports } from '../hooks/useReports';
@@ -115,12 +114,7 @@ export default function ReportsScreen({ navigation }: Props) {
 
   // ── Handlers ────────────────────────────────────────────
   async function handleExportPdf() {
-    const net = await NetInfo.fetch();
-    if (!net.isConnected) {
-      Alert.alert(t('Blad'), t('Ta funkcja wymaga polaczenia z internetem'));
-      return;
-    }
-
+    console.log('[Reports] handleExportPdf pressed, rangeType:', rangeType);
     setBuildingPdf(true);
     try {
       let dateFrom: Date;
@@ -149,12 +143,7 @@ export default function ReportsScreen({ navigation }: Props) {
   }
 
   async function handleGenerateLohnliste() {
-    const net = await NetInfo.fetch();
-    if (!net.isConnected) {
-      Alert.alert(t('Blad'), t('Ta funkcja wymaga polaczenia z internetem'));
-      return;
-    }
-
+    console.log('[Reports] handleGenerateLohnliste pressed');
     setLoadingLohn(true);
     try {
       const workersToFilter = selectedWorkers.length === workers.length ? [] : selectedWorkers;

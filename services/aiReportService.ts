@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 
 const PROXY_URL = process.env.EXPO_PUBLIC_LITELLM_PROXY_URL;
 const PROXY_KEY = process.env.EXPO_PUBLIC_LITELLM_KEY;
+console.log('[AI Config] PROXY_URL:', PROXY_URL ? PROXY_URL.slice(0, 40) : 'BRAK');
 const REPORT_TIMEOUT_MS = 30_000;
 
 export class AiReportError extends Error {
@@ -46,7 +47,9 @@ async function callProxy(prompt: string): Promise<string> {
     clearTimeout(timer);
 
     if (!response.ok) {
-      throw new AiReportError('Nie udało się połączyć z proxy.', 'network');
+      const body = await response.text().catch(() => '');
+      console.error('[AI Proxy] HTTP', response.status, body);
+      throw new AiReportError(`Proxy błąd ${response.status}: ${body.slice(0, 120)}`, 'network');
     }
 
     const json = await response.json();
@@ -59,7 +62,8 @@ async function callProxy(prompt: string): Promise<string> {
       throw new AiReportError('Przekroczono czas oczekiwania.', 'timeout');
     }
     if (err instanceof AiReportError) throw err;
-    throw new AiReportError('Nie udało się połączyć. Sprawdź internet.', 'network');
+    console.error('[AI Proxy] fetch error:', err?.message, err);
+    throw new AiReportError(`Błąd połączenia: ${err?.message ?? 'nieznany'}`, 'network');
   }
 }
 

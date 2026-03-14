@@ -40,7 +40,9 @@ export default function UnifiedSiteCard({
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const diff = calcDiff(tonnenPlan ?? null, tonnenReal ?? null);
+  // Use delivery tons as "real" when no manual value is set
+  const effectiveReal = tonnenReal ?? (deliveryTons > 0 ? deliveryTons : null);
+  const diff = calcDiff(tonnenPlan ?? null, effectiveReal);
   const isInactive = siteStatus !== 'active';
   const hasEinsatz = einsatzplanId != null;
   const hasDeliveries = deliveryCount > 0 || asphaltTypes.length > 0;
@@ -65,8 +67,8 @@ export default function UnifiedSiteCard({
 
   function startEdit() {
     setEditing(true);
-    setEditValue(tonnenReal !== null && tonnenReal !== undefined
-      ? String(tonnenReal).replace('.', ',')
+    setEditValue(effectiveReal !== null && effectiveReal !== undefined
+      ? String(effectiveReal).replace('.', ',')
       : '');
   }
 
@@ -95,7 +97,7 @@ export default function UnifiedSiteCard({
           </View>
         ) : null}
       </View>
-      {siteAddress ? <Text style={styles.siteAddr}>{siteAddress}</Text> : null}
+      {siteAddress ? <Text style={styles.siteAddr} numberOfLines={1} ellipsizeMode="tail">{siteAddress}</Text> : null}
 
       {/* Plan / Real / Diff — tylko jeśli jest wpis einsatzplan */}
       {hasEinsatz && (
@@ -126,7 +128,7 @@ export default function UnifiedSiteCard({
               ) : (
                 <TouchableOpacity onPress={startEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Text style={[styles.dataValue, styles.editableValue]}>
-                    {formatTonnen(tonnenReal ?? null)}
+                    {formatTonnen(effectiveReal)}
                   </Text>
                 </TouchableOpacity>
               )}

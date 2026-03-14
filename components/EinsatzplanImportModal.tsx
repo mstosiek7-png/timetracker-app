@@ -27,12 +27,13 @@ type Step = 'idle' | 'loading' | 'preview' | 'saving';
 interface DayState extends EinsatzplanOcrDay {
   matchedSiteId: string | null;
   matchedSiteName: string | null;
-  needsManualMatch: boolean;
+  matchScore: number;
 }
 
 interface Props {
   visible: boolean;
   onClose: () => void;
+  onImported?: (firstDate: string) => void;
 }
 
 const PROGRESS_MESSAGES_PL = [
@@ -46,7 +47,7 @@ const PROGRESS_MESSAGES_DE = [
   'Vorschau wird vorbereitet...',
 ];
 
-export default function EinsatzplanImportModal({ visible, onClose }: Props) {
+export default function EinsatzplanImportModal({ visible, onClose, onImported }: Props) {
   const { t, language } = useI18n();
   const queryClient = useQueryClient();
 
@@ -79,7 +80,7 @@ export default function EinsatzplanImportModal({ visible, onClose }: Props) {
 
   async function handleImport() {
     const net = await NetInfo.fetch();
-    if (!net.isConnected) {
+    if (net.isConnected === false) {
       Alert.alert(t('Blad'), t('Ta funkcja wymaga polaczenia z internetem'));
       return;
     }
@@ -117,12 +118,12 @@ export default function EinsatzplanImportModal({ visible, onClose }: Props) {
       // Match sites for each day
       const dayStates: DayState[] = await Promise.all(
         parsed.days.map(async (day) => {
-          const match = await matchSite(day.baustelle);
+          const match = await matchSite(day.kostenstelle);
           return {
             ...day,
             matchedSiteId: match?.siteId ?? null,
             matchedSiteName: match?.siteName ?? null,
-            needsManualMatch: !match,
+            matchScore: match?.score ?? 0,
           };
         }),
       );
@@ -155,20 +156,42 @@ export default function EinsatzplanImportModal({ visible, onClose }: Props) {
       const userId = user?.id ?? '';
 
       const siteMatches: Record<string, string> = {};
+
       for (const day of days) {
+        if (siteMatches[day.kostenstelle]) continue;
+
         if (day.matchedSiteId) {
-          siteMatches[day.baustelle] = day.matchedSiteId;
+          siteMatches[day.kostenstelle] = day.matchedSiteId;
+        } else {
+          // No match — auto-create a new construction site from OCR data
+          console.log('[Import] Auto-creating site:', day.kostenstelle, day.adresse);
+          const { data: newSite, error } = await supabase
+            .from('construction_sites')
+            .insert({
+              name: day.kostenstelle,
+              address: day.adresse ?? null,
+              status: 'active',
+              created_by: userId,
+            })
+            .select('id')
+            .single();
+
+          if (error) throw new Error(`Nie udało się utworzyć budowy "${day.kostenstelle}": ${error.message}`);
+          if (newSite) siteMatches[day.kostenstelle] = newSite.id;
         }
       }
-
       await saveEinsatzplanRows(ocrResult, documentId, userId, siteMatches);
       queryClient.invalidateQueries({ queryKey: ['einsatzplan-week'] });
       queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
+      queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
       setStep('idle');
-      onClose();
-    } catch {
+      const firstDate = ocrResult.days[0]?.date;
+      if (firstDate) onImported?.(firstDate);
+      else onClose();
+    } catch (err: any) {
+      console.error('[Import] handleConfirm error:', err?.message, err);
       setStep('preview');
-      Alert.alert(t('Blad'), t('Nie udalo sie zapisac wpisow'));
+      Alert.alert(t('Blad'), err?.message ?? t('Nie udalo sie zapisac wpisow'));
     }
   }
 
@@ -191,7 +214,7 @@ export default function EinsatzplanImportModal({ visible, onClose }: Props) {
     setDays((prev) =>
       prev.map((d, i) =>
         i === dayIdx
-          ? { ...d, matchedSiteId: siteId, matchedSiteName: siteName, needsManualMatch: false }
+          ? { ...d, matchedSiteId: siteId, matchedSiteName: siteName, matchScore: 1.0 }
           : d,
       ),
     );
@@ -258,11 +281,17 @@ export default function EinsatzplanImportModal({ visible, onClose }: Props) {
                       <Text style={styles.fieldValue}>{day.date}</Text>
                     </View>
 
-                    {/* Baustelle */}
+                    {/* Kostenstelle + Adresse */}
                     <View style={styles.fieldRow}>
-                      <Text style={styles.fieldLabel}>{t('Budowa')}</Text>
-                      <Text style={styles.fieldValue}>{day.baustelle}</Text>
+                      <Text style={styles.fieldLabel}>{t('Kostenstelle')}</Text>
+                      <Text style={styles.fieldValue}>{day.kostenstelle}</Text>
                     </View>
+                    {day.adresse ? (
+                      <View style={styles.fieldRow}>
+                        <Text style={styles.fieldLabel}>{t('Adres')}</Text>
+                        <Text style={styles.fieldValue}>{day.adresse}</Text>
+                      </View>
+                    ) : null}
 
                     {/* Mischgut */}
                     <View style={styles.fieldRow}>
@@ -314,25 +343,30 @@ export default function EinsatzplanImportModal({ visible, onClose }: Props) {
 
                     {/* Site match */}
                     <View style={styles.matchRow}>
-                      {day.needsManualMatch ? (
-                        <>
-                          <Text style={styles.matchWarning}>⚠️  {t('Wybierz recznie')}</Text>
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.siteChips}>
-                            {activeSites.map((site) => (
-                              <TouchableOpacity
-                                key={site.id}
-                                style={[styles.siteChip, day.matchedSiteId === site.id && styles.siteChipActive]}
-                                onPress={() => assignSite(idx, site.id, site.name)}
-                              >
-                                <Text style={[styles.siteChipText, day.matchedSiteId === site.id && styles.siteChipTextActive]}>
-                                  {site.name}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </ScrollView>
-                        </>
+                      {day.matchedSiteId ? (
+                        <Text style={day.matchScore < 0.5 ? styles.matchWeak : styles.matchOk}>
+                          {day.matchScore < 0.5 ? '⚠️  ' : '✓  '}{day.matchedSiteName}
+                          {day.matchScore < 0.5 ? (language === 'de' ? ' (unsicher)' : ' (niepewne)') : ''}
+                        </Text>
                       ) : (
-                        <Text style={styles.matchOk}>✓  {day.matchedSiteName}</Text>
+                        <Text style={styles.matchNew}>
+                          ➕  {language === 'de' ? `Wird neu erstellt: ${day.kostenstelle}` : `Zostanie utworzona: ${day.kostenstelle}`}
+                        </Text>
+                      )}
+                      {activeSites.length > 0 && (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.siteChips}>
+                          {activeSites.map((site) => (
+                            <TouchableOpacity
+                              key={site.id}
+                              style={[styles.siteChip, day.matchedSiteId === site.id && styles.siteChipActive]}
+                              onPress={() => assignSite(idx, site.id, site.name)}
+                            >
+                              <Text style={[styles.siteChipText, day.matchedSiteId === site.id && styles.siteChipTextActive]}>
+                                {site.name}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
                       )}
                     </View>
                   </View>
@@ -342,16 +376,33 @@ export default function EinsatzplanImportModal({ visible, onClose }: Props) {
 
             {/* Bottom actions */}
             <View style={styles.bottomBar}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
-                <Text style={styles.cancelBtnText}>{t('Anuluj')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.confirmBtn, days.every(d => d.matchedSiteId) ? {} : styles.confirmBtnDisabled]}
-                onPress={handleConfirm}
-                disabled={!days.every(d => d.matchedSiteId)}
-              >
-                <Text style={styles.confirmBtnText}>{t('Zatwierdz i importuj')}</Text>
-              </TouchableOpacity>
+              {(() => {
+                const matched = days.filter(d => d.matchedSiteId).length;
+                const total = days.length;
+                const skipped = total - matched;
+                return (
+                  <View style={{ flex: 1, gap: 10 }}>
+                    {skipped > 0 && (
+                      <Text style={styles.importSummary}>
+                        {language === 'de'
+                          ? `${matched} von ${total} werden importiert · ${skipped} übersprungen`
+                          : `${matched} z ${total} zostanie zapisanych · ${skipped} pominięte`}
+                      </Text>
+                    )}
+                    <View style={styles.bottomBtns}>
+                      <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
+                        <Text style={styles.cancelBtnText}>{t('Anuluj')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.confirmBtn}
+                        onPress={handleConfirm}
+                      >
+                        <Text style={styles.confirmBtnText}>{t('Zatwierdz i importuj')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })()}
             </View>
           </>
         )}
@@ -422,8 +473,10 @@ const styles = StyleSheet.create({
   },
 
   matchRow: { marginTop: 4 },
-  matchOk: { fontSize: 12, fontFamily: FontFamily.bold, color: '#22c55e' },
-  matchWarning: { fontSize: 12, fontFamily: FontFamily.bold, color: '#f97316', marginBottom: 8 },
+  matchOk: { fontSize: 12, fontFamily: FontFamily.bold, color: '#22c55e', marginBottom: 6 },
+  matchWeak: { fontSize: 12, fontFamily: FontFamily.bold, color: '#f97316', marginBottom: 6 },
+  matchNew: { fontSize: 12, fontFamily: FontFamily.bold, color: Colors.orange, marginBottom: 6 },
+  matchWarning: { fontSize: 12, fontFamily: FontFamily.bold, color: Colors.grayMid, marginBottom: 8 },
   siteChips: { flexGrow: 0 },
   siteChip: {
     paddingVertical: 6,
@@ -445,11 +498,16 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: Colors.white,
     padding: Spacing.lg,
-    flexDirection: 'row',
-    gap: 12,
     borderTopWidth: 1,
     borderTopColor: Colors.creamDark,
   },
+  importSummary: {
+    fontSize: 12,
+    fontFamily: FontFamily.medium,
+    color: Colors.grayMid,
+    textAlign: 'center',
+  },
+  bottomBtns: { flexDirection: 'row', gap: 12 },
   cancelBtn: {
     flex: 1,
     paddingVertical: 14,

@@ -19,6 +19,7 @@ export default function BaustellenScreen({ navigation }: Props) {
   const { t } = useI18n();
   const [showNewSite, setShowNewSite] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [importedDate, setImportedDate] = useState<string | null>(null);
   const [selectedDayKey, setSelectedDayKey] = useState(() => {
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -40,8 +41,9 @@ export default function BaustellenScreen({ navigation }: Props) {
       />
 
       <WeeklyView
-        onOpenSite={(siteId, dayKey) => navigation.navigate('SiteDetail', { siteId, day: dayKey })}
+        onOpenSite={(siteId, dayKey, mischgut) => navigation.navigate('SiteDetail', { siteId, day: dayKey, mischgut })}
         onSelectDay={setSelectedDayKey}
+        targetDate={importedDate}
       />
 
       <BottomNav
@@ -59,6 +61,7 @@ export default function BaustellenScreen({ navigation }: Props) {
       <EinsatzplanImportModal
         visible={showImport}
         onClose={() => setShowImport(false)}
+        onImported={(date) => { setImportedDate(date); setShowImport(false); }}
       />
     </SafeAreaView>
   );

@@ -24,15 +24,29 @@ type Props = {
   route: RouteProp<any>;
 };
 
-const ASPHALT_CLASSES = ['AC 11', 'AC 11 D S', 'AC 32', 'SMA 11', 'SMA 8', 'MA 11'];
+const ASPHALT_CLASSES = [
+  // Asphaltbeton Deckschicht (DIN EN 13108-1)
+  'AC 5 D S', 'AC 8 D S', 'AC 11 D S', 'AC 16 D S',
+  // Asphaltbeton Binderschicht
+  'AC 16 B S', 'AC 22 B S',
+  // Asphaltbeton Tragschicht
+  'AC 22 T S', 'AC 32 T S', 'AC 32 TN',
+  // Splittmastixasphalt (DIN EN 13108-5)
+  'SMA 5 S', 'SMA 8 S', 'SMA 11 S', 'SMA 16 S',
+  // Mastixasphalt (DIN EN 13108-6)
+  'MA 8 S', 'MA 11 S',
+  // Offenporiger Asphalt (DIN EN 13108-7)
+  'PA 8', 'PA 11',
+];
 
 export default function NewDeliveryScreen({ navigation, route }: Props) {
   const siteId = route.params?.siteId;
+  const defaultMischgut = route.params?.mischgut as string | undefined;
   const { addDelivery, getSite } = useBaustellen();
   const site = getSite(siteId);
   const { t, language } = useI18n();
 
-  const [asphaltClass, setAsphaltClass] = useState('');
+  const [asphaltClass, setAsphaltClass] = useState(defaultMischgut ?? '');
   const [weight, setWeight] = useState('');
   const [waybill, setWaybill] = useState('');
   const [supplier, setSupplier] = useState('');

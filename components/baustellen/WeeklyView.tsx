@@ -3,6 +3,7 @@
 // ============================================================
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { Colors, Spacing, FontFamily, Radius, Shadows } from '../../theme';
@@ -138,13 +139,41 @@ function useWeeklyData(weekStart: Date) {
 export default function WeeklyView({
   onOpenSite,
   onSelectDay,
+  targetDate,
 }: {
-  onOpenSite: (siteId: string, dayKey: string) => void;
+  onOpenSite: (siteId: string, dayKey: string, mischgut?: string | null) => void;
   onSelectDay?: (dayKey: string) => void;
+  targetDate?: string | null;  // ISO date string — jump to this week after import
 }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedKey, setSelectedKey] = useState(() => dateKey(new Date()));
   const { language, t } = useI18n();
+
+  // Restore last viewed week from storage on mount
+  useEffect(() => {
+    AsyncStorage.getItem('baustellen_week').then((saved) => {
+      if (!saved) return;
+      const d = new Date(saved);
+      if (!isNaN(d.getTime())) {
+        setWeekStart(startOfWeek(d));
+        setSelectedKey(saved);
+      }
+    });
+  }, []);
+
+  // Persist week changes
+  useEffect(() => {
+    AsyncStorage.setItem('baustellen_week', selectedKey);
+  }, [selectedKey]);
+
+  // Jump to the imported week when targetDate changes
+  useEffect(() => {
+    if (!targetDate) return;
+    const d = new Date(targetDate);
+    if (isNaN(d.getTime())) return;
+    setWeekStart(startOfWeek(d));
+    setSelectedKey(dateKey(d));
+  }, [targetDate]);
   const queryClient = useQueryClient();
 
   const weekdayLabels = language === 'de' ? WEEKDAY_LABELS_DE : WEEKDAY_LABELS_PL;
@@ -389,7 +418,7 @@ export default function WeeklyView({
                 deliveryCount={card.deliveryCount}
                 deliveryTons={card.deliveryTons}
                 asphaltTypes={card.asphaltTypes}
-                onPress={() => onOpenSite(card.siteId, selectedKey)}
+                onPress={() => onOpenSite(card.siteId, selectedKey, card.mischgut)}
                 onUpdateReal={handleUpdateReal}
                 formatTons={formatTons}
                 t={t}

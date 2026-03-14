@@ -186,16 +186,21 @@ export async function generateEinsatzplanPdf(
 ): Promise<string> {
   const { dateFrom, dateTo, rangeLabel } = options;
 
+  const fromStr = format(dateFrom, 'yyyy-MM-dd');
+  const toStr   = format(dateTo,   'yyyy-MM-dd');
+  console.log('[PDF] querying einsatzplan from', fromStr, 'to', toStr);
+
   const { data, error } = await supabase
     .from('einsatzplan')
     .select(
       `date, kw, year, mischgut, tonnen_plan, tonnen_real,
        construction_sites ( name, address )`,
     )
-    .gte('date', format(dateFrom, 'yyyy-MM-dd'))
-    .lte('date', format(dateTo, 'yyyy-MM-dd'))
+    .gte('date', fromStr)
+    .lte('date', toStr)
     .order('date');
 
+  console.log('[PDF] rows returned:', data?.length ?? 0, 'error:', error?.message);
   if (error) throw new Error('Błąd pobierania danych: ' + error.message);
   if (!data || data.length === 0)
     throw new Error('Brak danych dla wybranego zakresu.');

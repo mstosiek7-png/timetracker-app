@@ -544,6 +544,7 @@ export const strings: Record<Language, Record<string, string>> = {
     'Nowa budowa': 'Neue Baustelle',
     'Nazwa budowy': 'Baustellenname',
     'Adres': 'Adresse',
+    'Kostenstelle': 'Kostenstelle',
     'Klasy asfaltu': 'Asphaltklassen',
     'np. A40 Sanierung Abschnitt 3': 'z.B. A40 Sanierung Abschnitt 3',
     'np. A40, 45127 Essen': 'z.B. A40, 45127 Essen',

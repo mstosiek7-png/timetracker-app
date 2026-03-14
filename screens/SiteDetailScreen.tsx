@@ -14,6 +14,7 @@ import { AppHeader, Badge, BottomNav } from '../components/ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../theme';
 import { useBaustellen } from '../hooks/useBaustellen';
 import { useI18n } from '../i18n/I18nProvider';
+import { supabase } from '../services/supabase';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -23,28 +24,45 @@ type Props = {
 export default function SiteDetailScreen({ navigation, route }: Props) {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const siteId = route.params?.siteId;
+  const mischgut = route.params?.mischgut as string | undefined;
   const { getSite, deleteSite } = useBaustellen();
   const site = getSite(siteId);
   const { t, language } = useI18n();
 
   if (!site) return null;
 
-  const handleDelete = () => {
-    Alert.alert(t('Usun budowe'), `${t('Czy na pewno chcesz usunac')} "${site.name}"?`, [
-      { text: t('Anuluj'), style: 'cancel' },
-      { text: t('Usun'), style: 'destructive', onPress: async () => { 
-        setIsDeleting(true);
-        try {
-          await deleteSite(siteId); 
-          setIsDeleting(false);
-          navigation.goBack(); 
-        } catch (err) {
-          setIsDeleting(false);
-          const message = err instanceof Error ? err.message : t('Nieznany blad');
-          Alert.alert(t('Blad usuwania'), message);
-        }
-      } },
-    ]);
+  const handleDelete = async () => {
+    // Count linked einsatzplan entries
+    const { count } = await supabase
+      .from('einsatzplan')
+      .select('id', { count: 'exact', head: true })
+      .eq('construction_site_id', siteId);
+
+    const planWarning = count && count > 0
+      ? (language === 'de'
+          ? `\n\nAchtung: ${count} Einsatzplan-Einträge werden ebenfalls gelöscht.`
+          : `\n\nUwaga: zostanie też usuniętych ${count} wpisów z planu tygodniowego.`)
+      : '';
+
+    Alert.alert(
+      t('Usun budowe'),
+      `${t('Czy na pewno chcesz usunac')} "${site.name}"?${planWarning}`,
+      [
+        { text: t('Anuluj'), style: 'cancel' },
+        { text: t('Usun'), style: 'destructive', onPress: async () => {
+          setIsDeleting(true);
+          try {
+            await deleteSite(siteId);
+            setIsDeleting(false);
+            navigation.goBack();
+          } catch (err) {
+            setIsDeleting(false);
+            const message = err instanceof Error ? err.message : t('Nieznany blad');
+            Alert.alert(t('Blad usuwania'), message);
+          }
+        }},
+      ],
+    );
   };
 
   const HeaderRight = (
@@ -126,7 +144,7 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
       <View style={styles.addDeliveryBar}>
         <TouchableOpacity
           style={styles.addDeliveryBtn}
-          onPress={() => navigation.navigate('NewDelivery', { siteId })}
+          onPress={() => navigation.navigate('NewDelivery', { siteId, mischgut })}
           activeOpacity={0.9}
         >
           <Text style={styles.addDeliveryText}>+ {t('Dodaj dostawe')}</Text>
