@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../../theme';
 import { useI18n } from '../../i18n/I18nProvider';
+import EinsatzplanView from './EinsatzplanView';
 
 const WEEKDAY_LABELS_PL = ['Pn', 'Wt', 'Sr', 'Cz', 'Pt', 'Sb', 'Nd'];
 const WEEKDAY_FULL_PL = ['Poniedzialek', 'Wtorek', 'Sroda', 'Czwartek', 'Piatek', 'Sobota', 'Niedziela'];
@@ -115,6 +116,7 @@ export default function WeeklyView({
 }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedKey, setSelectedKey] = useState(() => dateKey(new Date()));
+  const [activeTab, setActiveTab] = useState<'deliveries' | 'einsatzplan'>('deliveries');
   const { language, t } = useI18n();
   const weekdayLabels = language === 'de' ? WEEKDAY_LABELS_DE : WEEKDAY_LABELS_PL;
   const weekdayFull = language === 'de' ? WEEKDAY_FULL_DE : WEEKDAY_FULL_PL;
@@ -300,6 +302,26 @@ export default function WeeklyView({
         </View>
       </View>
 
+      {/* ── Tab toggle: Dostawy / Einsatzplan ── */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'deliveries' && styles.tabActive]}
+          onPress={() => setActiveTab('deliveries')}
+        >
+          <Text style={[styles.tabText, activeTab === 'deliveries' && styles.tabTextActive]}>
+            {t('Dostawy')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'einsatzplan' && styles.tabActive]}
+          onPress={() => setActiveTab('einsatzplan')}
+        >
+          <Text style={[styles.tabText, activeTab === 'einsatzplan' && styles.tabTextActive]}>
+            Einsatzplan
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.daysGrid}>
           {weekDays.map(day => {
@@ -341,50 +363,56 @@ export default function WeeklyView({
           <Text style={styles.dayDetailMeta}>🚛 {selectedBucket.deliveries.length} {t('dostawy')}</Text>
         </View>
 
-        <View style={styles.siteList}>
-          {selectedSites.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>{t('Brak budow w tym dniu')}</Text>
-              <Text style={styles.emptySubtext}>{t('Dodaj budowe z poziomu FAB')}</Text>
-            </View>
-          ) : (
-            selectedSites.map(site => (
-              <TouchableOpacity
-                key={site.id}
-                style={[styles.siteCard, site.status !== 'active' && styles.siteCardInactive]}
-                onPress={() => onOpenSite(site.id, selectedKey)}
-                activeOpacity={0.85}
-              >
-                <View style={styles.cardTop}>
-                  <View style={[styles.statusPill, site.status !== 'active' && styles.statusPillInactive]}>
-                    <Text style={[styles.statusPillText, site.status !== 'active' && styles.statusPillTextInactive]}>
-                      {site.status === 'active' ? t('AKTYWNA') : t('ZAMKNIETA')}
-                    </Text>
-                  </View>
-                  <Text style={styles.cardArrow}>›</Text>
-                </View>
-                <Text style={styles.siteName}>{site.name}</Text>
-                {site.address && (
-                  <Text style={styles.siteAddress}>{site.address}</Text>
-                )}
-                <View style={styles.siteTags}>
-                  {(dayTonsBySite[site.id] ?? 0) > 0 && (
-                    <View style={[styles.tag, styles.tagOrange]}>
-                      <Text style={[styles.tagText, styles.tagTextOrange]}>
-                        🚛 {formatTons(dayTonsBySite[site.id])}
+        {activeTab === 'deliveries' ? (
+          <View style={styles.siteList}>
+            {selectedSites.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>{t('Brak budow w tym dniu')}</Text>
+                <Text style={styles.emptySubtext}>{t('Dodaj budowe z poziomu FAB')}</Text>
+              </View>
+            ) : (
+              selectedSites.map(site => (
+                <TouchableOpacity
+                  key={site.id}
+                  style={[styles.siteCard, site.status !== 'active' && styles.siteCardInactive]}
+                  onPress={() => onOpenSite(site.id, selectedKey)}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.cardTop}>
+                    <View style={[styles.statusPill, site.status !== 'active' && styles.statusPillInactive]}>
+                      <Text style={[styles.statusPillText, site.status !== 'active' && styles.statusPillTextInactive]}>
+                        {site.status === 'active' ? t('AKTYWNA') : t('ZAMKNIETA')}
                       </Text>
                     </View>
+                    <Text style={styles.cardArrow}>›</Text>
+                  </View>
+                  <Text style={styles.siteName}>{site.name}</Text>
+                  {site.address && (
+                    <Text style={styles.siteAddress}>{site.address}</Text>
                   )}
-                  {site.asphaltTypes.map(type => (
-                    <View key={type} style={styles.tag}>
-                      <Text style={styles.tagText}>{type}</Text>
-                    </View>
-                  ))}
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
+                  <View style={styles.siteTags}>
+                    {(dayTonsBySite[site.id] ?? 0) > 0 && (
+                      <View style={[styles.tag, styles.tagOrange]}>
+                        <Text style={[styles.tagText, styles.tagTextOrange]}>
+                          🚛 {formatTons(dayTonsBySite[site.id])}
+                        </Text>
+                      </View>
+                    )}
+                    {site.asphaltTypes.map(type => (
+                      <View key={type} style={styles.tag}>
+                        <Text style={styles.tagText}>{type}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        ) : (
+          <View style={styles.siteList}>
+            <EinsatzplanView weekStart={weekStart} selectedKey={selectedKey} />
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -435,6 +463,29 @@ const styles = StyleSheet.create({
   summaryValue: { fontSize: 22, fontFamily: FontFamily.bold, color: Colors.orange, lineHeight: 22 },
   summaryLabel: { fontSize: 10, fontFamily: FontFamily.bold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.5 },
   summaryDivider: { width: 1, alignSelf: 'stretch', backgroundColor: Colors.creamDark },
+
+  tabRow: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.lg,
+    marginTop: 12,
+    marginBottom: 4,
+    backgroundColor: Colors.cream,
+    borderRadius: 12,
+    padding: 3,
+    gap: 3,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  tabActive: {
+    backgroundColor: Colors.white,
+    ...Shadows.sm,
+  },
+  tabText: { fontSize: 13, fontFamily: FontFamily.bold, color: Colors.grayMid },
+  tabTextActive: { color: Colors.orange },
 
   scroll: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: 16, paddingBottom: 100 },
   daysGrid: {

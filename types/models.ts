@@ -241,4 +241,49 @@ export interface EmployeeWithEntries extends Employee {
   time_entries: TimeEntry[];
 }
 
+// =====================================================
+// Einsatzplan
+// =====================================================
+
+export interface Einsatzplan {
+  id: string;
+  construction_site_id: string;
+  date: string;
+  mischgut: string | null;
+  tonnen_plan: number | null;
+  tonnen_real: number | null;
+  kw: number | null;
+  year: number | null;
+  document_id: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+export type EinsatzplanInsert = Omit<Einsatzplan, 'id' | 'created_at' | 'updated_at' | 'created_by'>;
+export type EinsatzplanUpdate = Partial<EinsatzplanInsert>;
+
+export interface EinsatzplanWithSite extends Einsatzplan {
+  construction_sites: {
+    name: string;
+    address: string | null;
+  } | null;
+}
+
+// OCR parsed day from Einsatzplan photo
+export interface EinsatzplanOcrDay {
+  date: string;
+  baustelle: string;
+  adresse: string | null;
+  mischgut: string | null;
+  tonnen_plan: number | null;
+  confidence: number;
+}
+
+export interface EinsatzplanOcrResult {
+  kw: number;
+  year: number;
+  days: EinsatzplanOcrDay[];
+}
+
 

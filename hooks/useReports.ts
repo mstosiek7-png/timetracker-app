@@ -12,15 +12,19 @@ import {
   deleteAsync,
   EncodingType,
 } from 'expo-file-system/legacy';
-import { 
-  generateExcelReport, 
-  generatePdfReport, 
+import {
+  generateExcelReport,
+  generatePdfReport,
   generateConstructionExcelReport,
   generateConstructionPdfReport,
   shareReport,
   ExportOptions,
-  ExportConstructionOptions
+  ExportConstructionOptions,
 } from '../services/export';
+import {
+  generateBaustellenReport,
+  generateLohnliste,
+} from '../services/aiReportService';
 import { useI18n } from '../i18n/I18nProvider';
 
 export interface ReportStats {
@@ -157,8 +161,9 @@ export function useReports() {
     workerIds?: string[];
     format: 'xlsx' | 'pdf';
     includeNotes: boolean;
-    reportType?: 'employees' | 'construction' | 'construction_weekly';
+    reportType?: 'employees' | 'construction' | 'construction_weekly' | 'ai_baustellen' | 'ai_lohnliste';
     siteIds?: string[];
+    selectedSiteId?: string;
   }): Promise<void> {
     try {
       let fileUri: string;
@@ -178,6 +183,20 @@ export function useReports() {
         } else {
           fileUri = await generatePdfReport(exportOptions);
         }
+      } else if (reportType === 'ai_baustellen') {
+        if (!selectedSiteId) throw new Error('Wybierz budowę do raportu');
+        fileUri = await generateBaustellenReport({
+          siteId: selectedSiteId,
+          dateFrom,
+          dateTo,
+          language,
+        });
+      } else if (reportType === 'ai_lohnliste') {
+        fileUri = await generateLohnliste({
+          employeeIds: workerIds,
+          dateFrom,
+          dateTo,
+        });
       } else {
         // Wszystkie raporty budów (dzienne, tygodniowe) obsługuje teraz ten sam zunifikowany eksport
         const constructionOptions: ExportConstructionOptions = {

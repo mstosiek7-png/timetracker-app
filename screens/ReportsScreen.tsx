@@ -2,7 +2,7 @@
 // TimeTracker — Screen: ReportsScreen
 // Plik: src/screens/ReportsScreen.tsx
 // ============================================================
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, StatusBar, Alert,
@@ -10,11 +10,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import NetInfo from '@react-native-community/netinfo';
 import { AppHeader, Badge, Checkbox, BottomNav, PrimaryButton } from '../components/ui';
 import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../theme';
 import { useReports } from '../hooks/useReports';
 import { useWorkers } from '../hooks/useWorkers';
 import { useI18n } from '../i18n/I18nProvider';
+import { supabase } from '../services/supabase';
 
 type Props = { navigation: NativeStackNavigationProp<any> };
 type RangeMode = 'current' | 'previous' | 'custom';
@@ -34,7 +36,17 @@ export default function ReportsScreen({ navigation }: Props) {
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker]     = useState(false);
   const [loading, setLoading] = useState(false);
-  const [reportType, setReportType] = useState<'employees' | 'construction' | 'construction_weekly'>('employees');
+  const [reportType, setReportType] = useState<'employees' | 'construction' | 'construction_weekly' | 'ai_baustellen' | 'ai_lohnliste'>('employees');
+  const [activeSites, setActiveSites] = useState<{ id: string; name: string }[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from('construction_sites')
+      .select('id, name')
+      .eq('status', 'active')
+      .then(({ data }) => { if (data) setActiveSites(data); });
+  }, []);
 
   function setRange(mode: RangeMode) {
     setRangeMode(mode);
@@ -57,22 +69,37 @@ export default function ReportsScreen({ navigation }: Props) {
   const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
 
   async function handleGenerate() {
+    // AI reports require internet
+    if (reportType === 'ai_baustellen' || reportType === 'ai_lohnliste') {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) {
+        Alert.alert(t('Blad'), t('Ta funkcja wymaga polaczenia z internetem'));
+        return;
+      }
+    }
+    if (reportType === 'ai_baustellen' && !selectedSiteId) {
+      Alert.alert(t('Blad'), t('Wybierz budowe do raportu'));
+      return;
+    }
+
     setLoading(true);
     try {
       // Jeśli selectedWorkers zawiera wszystkich pracowników, wyślij puste (oznacza: wszyscy)
       const workersToFilter = selectedWorkers.length === workers.length ? [] : selectedWorkers;
-      await generateReport({ 
-        dateFrom, 
-        dateTo, 
-        workerIds: workersToFilter, 
-        format: exportFormat, 
+      await generateReport({
+        dateFrom,
+        dateTo,
+        workerIds: workersToFilter,
+        format: exportFormat,
         includeNotes,
-        reportType
+        reportType,
+        selectedSiteId: selectedSiteId ?? undefined,
       });
       // Success message removed - share dialog will appear automatically
     } catch (error) {
       console.error('Generate report error:', error);
-      Alert.alert('Błąd', 'Nie udało się wygenerować raportu: ' + (error as Error).message);
+      const msg = (error as Error).message;
+      Alert.alert(t('Blad'), msg || t('Nie udalo sie wygenerowac raportu.'));
     } finally {
       setLoading(false);
     }
@@ -105,7 +132,7 @@ export default function ReportsScreen({ navigation }: Props) {
                 {t('Zestawienie budów')}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.reportTypeBtn, reportType === 'construction_weekly' && styles.reportTypeBtnActive]}
               onPress={() => setReportType('construction_weekly')}
             >
@@ -113,8 +140,44 @@ export default function ReportsScreen({ navigation }: Props) {
                 {t('Tagesrapport')}
               </Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reportTypeBtn, reportType === 'ai_baustellen' && styles.reportTypeBtnActive]}
+              onPress={() => setReportType('ai_baustellen')}
+            >
+              <Text style={[styles.reportTypeBtnText, reportType === 'ai_baustellen' && styles.reportTypeBtnTextActive]}>
+                🤖  {t('Eksport Budowy')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reportTypeBtn, reportType === 'ai_lohnliste' && styles.reportTypeBtnActive]}
+              onPress={() => setReportType('ai_lohnliste')}
+            >
+              <Text style={[styles.reportTypeBtnText, reportType === 'ai_lohnliste' && styles.reportTypeBtnTextActive]}>
+                🤖  {t('Lohnliste')}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
+
+        {/* ─── AI: Site selector for Eksport Budowy ──── */}
+        {reportType === 'ai_baustellen' && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>{t('Wybierz budowe do raportu')}</Text>
+            <View style={styles.workerChips}>
+              {activeSites.map(site => (
+                <TouchableOpacity
+                  key={site.id}
+                  style={[styles.workerFilterChip, selectedSiteId === site.id && styles.workerFilterChipActive]}
+                  onPress={() => setSelectedSiteId(site.id)}
+                >
+                  <Text style={[styles.workerFilterText, selectedSiteId === site.id && styles.workerFilterTextActive]}>
+                    {site.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* ─── Date range ────────────────────────────── */}
         <View style={styles.card}>
