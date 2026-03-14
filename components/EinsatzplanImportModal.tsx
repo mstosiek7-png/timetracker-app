@@ -163,6 +163,7 @@ export default function EinsatzplanImportModal({ visible, onClose }: Props) {
 
       await saveEinsatzplanRows(ocrResult, documentId, userId, siteMatches);
       queryClient.invalidateQueries({ queryKey: ['einsatzplan-week'] });
+      queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
       setStep('idle');
       onClose();
     } catch {

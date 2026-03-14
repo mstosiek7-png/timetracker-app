@@ -1,13 +1,13 @@
 // ============================================================
-// WeeklyView — Baustellen weekly calendar
+// WeeklyView — Baustellen weekly calendar (unified view)
 // ============================================================
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
-import { Colors, Spacing, FontFamily, FontSize, Radius, Shadows } from '../../theme';
+import { Colors, Spacing, FontFamily, Radius, Shadows } from '../../theme';
 import { useI18n } from '../../i18n/I18nProvider';
-import EinsatzplanView from './EinsatzplanView';
+import UnifiedSiteCard from './UnifiedSiteCard';
 
 const WEEKDAY_LABELS_PL = ['Pn', 'Wt', 'Sr', 'Cz', 'Pt', 'Sb', 'Nd'];
 const WEEKDAY_FULL_PL = ['Poniedzialek', 'Wtorek', 'Sroda', 'Czwartek', 'Piatek', 'Sobota', 'Niedziela'];
@@ -18,7 +18,7 @@ const MONTHS_DE = ['Jan', 'Feb', 'Mar', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep'
 
 function startOfWeek(date: Date) {
   const d = new Date(date);
-  const day = (d.getDay() + 6) % 7; // Monday = 0
+  const day = (d.getDay() + 6) % 7;
   d.setDate(d.getDate() - day);
   d.setHours(0, 0, 0, 0);
   return d;
@@ -41,9 +41,7 @@ function formatWeekLabel(start: Date, months: string[]) {
   const end = addDays(start, 6);
   const startDay = String(start.getDate()).padStart(2, '0');
   const endDay = String(end.getDate()).padStart(2, '0');
-  const monthLabel = months[end.getMonth()];
-  const year = end.getFullYear();
-  return `${startDay} – ${endDay} ${monthLabel} ${year}`;
+  return `${startDay} – ${endDay} ${months[end.getMonth()]} ${end.getFullYear()}`;
 }
 
 type DeliveryRow = {
@@ -61,30 +59,48 @@ type SiteRow = {
   deliveries?: DeliveryRow[] | null;
 };
 
+type EinsatzplanRow = {
+  id: string;
+  date: string;
+  mischgut: string | null;
+  tonnen_plan: number | null;
+  tonnen_real: number | null;
+  construction_site_id: string;
+  construction_sites?: { name: string; address: string | null } | null;
+};
+
 function useWeeklyData(weekStart: Date) {
   const startISO = weekStart.toISOString();
   const endISO = addDays(weekStart, 7).toISOString();
+  const startDate = startISO.slice(0, 10);
+  const endDate = endISO.slice(0, 10);
 
   return useQuery({
     queryKey: ['baustellen-week', startISO],
     queryFn: async () => {
-      const { data: sitesRaw, error: sitesError } = await supabase
-        .from('construction_sites')
-        .select('id, name, address, status, site_date')
-        .order('created_at', { ascending: false });
+      const [sitesResult, deliveriesResult, einsatzplanResult] = await Promise.all([
+        supabase
+          .from('construction_sites')
+          .select('id, name, address, status, site_date')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('deliveries')
+          .select('site_id, tons, delivery_time, asphalt_types(name)')
+          .gte('delivery_time', startISO)
+          .lt('delivery_time', endISO),
+        supabase
+          .from('einsatzplan')
+          .select('id, date, mischgut, tonnen_plan, tonnen_real, construction_site_id, construction_sites(name, address)')
+          .gte('date', startDate)
+          .lt('date', endDate)
+          .order('date'),
+      ]);
 
-      if (sitesError) throw sitesError;
-
-      const { data: deliveriesRaw, error: delError } = await supabase
-        .from('deliveries')
-        .select('site_id, tons, delivery_time, asphalt_types(name)')
-        .gte('delivery_time', startISO)
-        .lt('delivery_time', endISO);
-
-      if (delError) throw delError;
+      if (sitesResult.error) throw sitesResult.error;
+      if (deliveriesResult.error) throw deliveriesResult.error;
 
       const deliveriesBySite: Record<string, DeliveryRow[]> = {};
-      (deliveriesRaw ?? []).forEach((delivery: any) => {
+      (deliveriesResult.data ?? []).forEach((delivery: any) => {
         const siteId = delivery.site_id as string;
         if (!deliveriesBySite[siteId]) deliveriesBySite[siteId] = [];
         deliveriesBySite[siteId].push({
@@ -94,7 +110,7 @@ function useWeeklyData(weekStart: Date) {
         });
       });
 
-      return (sitesRaw ?? []).map(site => ({
+      const sites = (sitesResult.data ?? []).map(site => ({
         id: site.id,
         name: site.name,
         address: site.address ?? null,
@@ -102,6 +118,18 @@ function useWeeklyData(weekStart: Date) {
         site_date: site.site_date,
         deliveries: deliveriesBySite[site.id] ?? [],
       })) as SiteRow[];
+
+      const einsatzplanRows = (einsatzplanResult.data ?? []).map((ep: any) => ({
+        id: ep.id,
+        date: ep.date,
+        mischgut: ep.mischgut ?? null,
+        tonnen_plan: ep.tonnen_plan ?? null,
+        tonnen_real: ep.tonnen_real ?? null,
+        construction_site_id: ep.construction_site_id,
+        construction_sites: ep.construction_sites ?? null,
+      })) as EinsatzplanRow[];
+
+      return { sites, einsatzplanRows };
     },
     staleTime: 2 * 60 * 1000,
   });
@@ -116,19 +144,19 @@ export default function WeeklyView({
 }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedKey, setSelectedKey] = useState(() => dateKey(new Date()));
-  const [activeTab, setActiveTab] = useState<'deliveries' | 'einsatzplan'>('deliveries');
   const { language, t } = useI18n();
-  const weekdayLabels = language === 'de' ? WEEKDAY_LABELS_DE : WEEKDAY_LABELS_PL;
-  const weekdayFull = language === 'de' ? WEEKDAY_FULL_DE : WEEKDAY_FULL_PL;
-  const monthsShort = language === 'de' ? MONTHS_DE : MONTHS_PL;
-  const formatTons = (value: number) => {
-    const formatted = value.toFixed(1).replace('.', ',');
-    return `${formatted} t`;
-  };
+  const queryClient = useQueryClient();
 
-  const { data: sites = [] } = useWeeklyData(weekStart);
-  // Wyświetl wszystkie budowy z adresem
-  const allSitesWithAddress = sites.filter(site => site.address && site.address.trim() !== '');
+  const weekdayLabels = language === 'de' ? WEEKDAY_LABELS_DE : WEEKDAY_LABELS_PL;
+  const weekdayFull   = language === 'de' ? WEEKDAY_FULL_DE   : WEEKDAY_FULL_PL;
+  const monthsShort   = language === 'de' ? MONTHS_DE         : MONTHS_PL;
+
+  const formatTons = (value: number) =>
+    `${value.toFixed(1).replace('.', ',')} t`;
+
+  const { data: weekData } = useWeeklyData(weekStart);
+  const sites           = weekData?.sites ?? [];
+  const einsatzplanRows = weekData?.einsatzplanRows ?? [];
 
   useEffect(() => {
     const today = new Date();
@@ -142,26 +170,19 @@ export default function WeeklyView({
   const weekDays = useMemo(() => (
     weekdayLabels.map((label, idx) => {
       const dayDate = addDays(weekStart, idx);
-      return {
-        label,
-        date: dayDate,
-        key: dateKey(dayDate),
-        dayNumber: dayDate.getDate(),
-      };
+      return { label, date: dayDate, key: dateKey(dayDate), dayNumber: dayDate.getDate() };
     })
   ), [weekStart, weekdayLabels]);
 
+  // Deliveries grouped by date
   const dayBuckets = useMemo(() => {
     const buckets: Record<string, { deliveries: { siteId: string; siteName: string; status: string | null; tons: number; asphalt: string | null }[] }> = {};
-    weekDays.forEach(day => {
-      buckets[day.key] = { deliveries: [] };
-    });
+    weekDays.forEach(day => { buckets[day.key] = { deliveries: [] }; });
 
     sites.forEach(site => {
       (site.deliveries ?? []).forEach(delivery => {
         if (!delivery.delivery_time) return;
-        const dt = new Date(delivery.delivery_time);
-        const key = dateKey(dt);
+        const key = dateKey(new Date(delivery.delivery_time));
         if (!buckets[key]) return;
         buckets[key].deliveries.push({
           siteId: site.id,
@@ -172,28 +193,34 @@ export default function WeeklyView({
         });
       });
     });
+    return buckets;
+  }, [sites, weekDays]);
 
+  // Einsatzplan grouped by date
+  const einsatzplanByDay = useMemo(() => {
+    const map: Record<string, EinsatzplanRow[]> = {};
+    einsatzplanRows.forEach(ep => {
+      if (!map[ep.date]) map[ep.date] = [];
+      map[ep.date].push(ep);
+    });
+    return map;
+  }, [einsatzplanRows]);
+
+  // Sites by site_date (for sites added via NewConstructionModal)
+  const daySites = useMemo(() => {
+    const buckets: Record<string, { siteIds: string[] }> = {};
+    weekDays.forEach(day => { buckets[day.key] = { siteIds: [] }; });
+    sites.forEach(site => {
+      if (!site.site_date) return;
+      if (!buckets[site.site_date]) return;
+      buckets[site.site_date].siteIds.push(site.id);
+    });
     return buckets;
   }, [sites, weekDays]);
 
   const todayKey = dateKey(new Date());
 
-  const daySites = useMemo(() => {
-    const buckets: Record<string, { siteIds: string[] }> = {};
-    weekDays.forEach(day => {
-      buckets[day.key] = { siteIds: [] };
-    });
-
-    sites.forEach(site => {
-      if (!site.site_date) return;
-      const key = site.site_date;
-      if (!buckets[key]) return;
-      buckets[key].siteIds.push(site.id);
-    });
-
-    return buckets;
-  }, [sites, weekDays]);
-
+  // Summary bar
   const summary = useMemo(() => {
     let totalTons = 0;
     let deliveryCount = 0;
@@ -206,73 +233,64 @@ export default function WeeklyView({
         siteSet.add(d.siteId);
       });
     });
-
     Object.values(daySites).forEach(bucket => {
       bucket.siteIds.forEach(id => siteSet.add(id));
     });
+    einsatzplanRows.forEach(ep => siteSet.add(ep.construction_site_id));
 
-    return {
-      totalTons,
-      deliveryCount,
-      siteCount: siteSet.size,
-    };
-  }, [dayBuckets, daySites]);
+    return { totalTons, deliveryCount, siteCount: siteSet.size };
+  }, [dayBuckets, daySites, einsatzplanRows]);
 
-  const selectedBucket = dayBuckets[selectedKey] ?? { deliveries: [] };
+  // Unified cards for selected day
+  const unifiedCards = useMemo(() => {
+    const epEntries   = einsatzplanByDay[selectedKey] ?? [];
+    const delivBucket = dayBuckets[selectedKey]?.deliveries ?? [];
+    const daySiteIds  = daySites[selectedKey]?.siteIds ?? [];
 
-  const selectedSites = useMemo(() => {
-    const map: Record<string, { id: string; name: string; address?: string | null; status: string | null; tons: number; asphaltTypes: string[] }> = {};
+    const siteIdSet = new Set<string>([
+      ...epEntries.map(ep => ep.construction_site_id),
+      ...delivBucket.map(d => d.siteId),
+      ...daySiteIds,
+    ]);
 
-    selectedBucket.deliveries.forEach(d => {
-      const site = sites.find(s => s.id === d.siteId);
-      if (!map[d.siteId]) {
-        map[d.siteId] = {
-          id: d.siteId,
-          name: d.siteName,
-          address: site?.address ?? undefined,
-          status: d.status,
-          tons: 0,
-          asphaltTypes: []
-        };
-      }
-      map[d.siteId].tons += d.tons;
-      if (d.asphalt && !map[d.siteId].asphaltTypes.includes(d.asphalt)) {
-        map[d.siteId].asphaltTypes.push(d.asphalt);
-      }
+    return [...siteIdSet].map(siteId => {
+      const ep    = epEntries.find(e => e.construction_site_id === siteId) ?? null;
+      const delivs = delivBucket.filter(d => d.siteId === siteId);
+      const site   = sites.find(s => s.id === siteId);
+
+      return {
+        siteId,
+        siteName:    ep?.construction_sites?.name ?? site?.name ?? '—',
+        siteAddress: ep?.construction_sites?.address ?? site?.address ?? null,
+        siteStatus:  site?.status ?? null,
+        einsatzplanId: ep?.id ?? null,
+        mischgut:    ep?.mischgut ?? null,
+        tonnenPlan:  ep?.tonnen_plan ?? null,
+        tonnenReal:  ep?.tonnen_real ?? null,
+        deliveryCount: delivs.length,
+        deliveryTons:  delivs.reduce((s, d) => s + d.tons, 0),
+        asphaltTypes:  [...new Set(delivs.map(d => d.asphalt).filter(Boolean) as string[])],
+      };
     });
+  }, [einsatzplanByDay, dayBuckets, daySites, sites, selectedKey]);
 
-    sites.forEach(site => {
-      if (site.site_date !== selectedKey) return;
-      if (!map[site.id]) {
-        map[site.id] = {
-          id: site.id,
-          name: site.name,
-          address: site.address,
-          status: site.status,
-          tons: 0,
-          asphaltTypes: []
-        };
-      } else {
-        map[site.id].address = site.address;
-      }
-    });
-
-    return Object.values(map);
-  }, [selectedBucket, sites, selectedKey]);
-
-  const dayTonsBySite = useMemo(() => {
-    const map: Record<string, number> = {};
-    selectedBucket.deliveries.forEach(d => {
-      map[d.siteId] = (map[d.siteId] ?? 0) + d.tons;
-    });
-    return map;
-  }, [selectedBucket]);
+  // Update tonnen_real + invalidate query
+  async function handleUpdateReal(einsatzplanId: string, value: number) {
+    const { error } = await supabase
+      .from('einsatzplan')
+      .update({ tonnen_real: value, updated_at: new Date().toISOString() })
+      .eq('id', einsatzplanId);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
+  }
 
   const selectedDate = weekDays.find(d => d.key === selectedKey)?.date ?? weekStart;
   const selectedLabel = `${weekdayFull[(selectedDate.getDay() + 6) % 7]}, ${String(selectedDate.getDate()).padStart(2, '0')} ${monthsShort[selectedDate.getMonth()]}`;
+  const selectedDeliveryCount = dayBuckets[selectedKey]?.deliveries.length ?? 0;
 
   return (
     <View style={styles.container}>
+      {/* Week navigation */}
       <View style={styles.weekNav}>
         <Text style={styles.weekLabel}>{formatWeekLabel(weekStart, monthsShort)}</Text>
         <View style={styles.weekArrows}>
@@ -285,6 +303,7 @@ export default function WeeklyView({
         </View>
       </View>
 
+      {/* Summary bar */}
       <View style={styles.summaryBar}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>{formatTons(summary.totalTons)}</Text>
@@ -302,51 +321,35 @@ export default function WeeklyView({
         </View>
       </View>
 
-      {/* ── Tab toggle: Dostawy / Einsatzplan ── */}
-      <View style={styles.tabRow}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'deliveries' && styles.tabActive]}
-          onPress={() => setActiveTab('deliveries')}
-        >
-          <Text style={[styles.tabText, activeTab === 'deliveries' && styles.tabTextActive]}>
-            {t('Dostawy')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'einsatzplan' && styles.tabActive]}
-          onPress={() => setActiveTab('einsatzplan')}
-        >
-          <Text style={[styles.tabText, activeTab === 'einsatzplan' && styles.tabTextActive]}>
-            Einsatzplan
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Day chips */}
         <View style={styles.daysGrid}>
           {weekDays.map(day => {
-            const bucket = dayBuckets[day.key];
+            const bucket      = dayBuckets[day.key];
             const sitesForDay = daySites[day.key];
-            const totalTons = bucket ? bucket.deliveries.reduce((sum, d) => sum + d.tons, 0) : 0;
+            const epForDay    = einsatzplanByDay[day.key];
+            const totalTons   = bucket ? bucket.deliveries.reduce((sum, d) => sum + d.tons, 0) : 0;
+
             const siteIdSet = new Set<string>();
             (bucket?.deliveries ?? []).forEach(d => siteIdSet.add(d.siteId));
             (sitesForDay?.siteIds ?? []).forEach(id => siteIdSet.add(id));
+            (epForDay ?? []).forEach(ep => siteIdSet.add(ep.construction_site_id));
+
             const siteCount = siteIdSet.size;
-            const hasData = (bucket?.deliveries?.length ?? 0) > 0 || (sitesForDay?.siteIds?.length ?? 0) > 0;
+            const hasData = siteCount > 0;
             const isActive = day.key === selectedKey;
-            const isToday = day.key === todayKey;
+            const isToday  = day.key === todayKey;
 
             return (
               <TouchableOpacity
                 key={day.key}
                 style={[styles.dayChip, isToday && styles.dayChipToday, isActive && styles.dayChipActive]}
-                onPress={() => {
-                  setSelectedKey(day.key);
-                  onSelectDay?.(day.key);
-                }}
+                onPress={() => { setSelectedKey(day.key); onSelectDay?.(day.key); }}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.dayName, isToday && styles.dayNameToday, isActive && styles.dayNameActive]}>{day.label}</Text>
+                <Text style={[styles.dayName, isToday && styles.dayNameToday, isActive && styles.dayNameActive]}>
+                  {day.label}
+                </Text>
                 <Text style={[styles.dayNumber, isActive && styles.dayNumberActive]}>{day.dayNumber}</Text>
                 <View style={[styles.dayDot, hasData && styles.dayDotActive, isActive && styles.dayDotActiveOn]} />
                 <Text style={[styles.dayTons, isActive && styles.dayTonsActive]}>{formatTons(totalTons)}</Text>
@@ -358,69 +361,50 @@ export default function WeeklyView({
           })}
         </View>
 
+        {/* Day header */}
         <View style={styles.dayDetailHeader}>
           <Text style={styles.dayDetailTitle}>{selectedLabel}</Text>
-          <Text style={styles.dayDetailMeta}>🚛 {selectedBucket.deliveries.length} {t('dostawy')}</Text>
+          <Text style={styles.dayDetailMeta}>🚛 {selectedDeliveryCount} {t('dostawy')}</Text>
         </View>
 
-        {activeTab === 'deliveries' ? (
-          <View style={styles.siteList}>
-            {selectedSites.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>{t('Brak budow w tym dniu')}</Text>
-                <Text style={styles.emptySubtext}>{t('Dodaj budowe z poziomu FAB')}</Text>
-              </View>
-            ) : (
-              selectedSites.map(site => (
-                <TouchableOpacity
-                  key={site.id}
-                  style={[styles.siteCard, site.status !== 'active' && styles.siteCardInactive]}
-                  onPress={() => onOpenSite(site.id, selectedKey)}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.cardTop}>
-                    <View style={[styles.statusPill, site.status !== 'active' && styles.statusPillInactive]}>
-                      <Text style={[styles.statusPillText, site.status !== 'active' && styles.statusPillTextInactive]}>
-                        {site.status === 'active' ? t('AKTYWNA') : t('ZAMKNIETA')}
-                      </Text>
-                    </View>
-                    <Text style={styles.cardArrow}>›</Text>
-                  </View>
-                  <Text style={styles.siteName}>{site.name}</Text>
-                  {site.address && (
-                    <Text style={styles.siteAddress}>{site.address}</Text>
-                  )}
-                  <View style={styles.siteTags}>
-                    {(dayTonsBySite[site.id] ?? 0) > 0 && (
-                      <View style={[styles.tag, styles.tagOrange]}>
-                        <Text style={[styles.tagText, styles.tagTextOrange]}>
-                          🚛 {formatTons(dayTonsBySite[site.id])}
-                        </Text>
-                      </View>
-                    )}
-                    {site.asphaltTypes.map(type => (
-                      <View key={type} style={styles.tag}>
-                        <Text style={styles.tagText}>{type}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
-        ) : (
-          <View style={styles.siteList}>
-            <EinsatzplanView weekStart={weekStart} selectedKey={selectedKey} />
-          </View>
-        )}
+        {/* Unified site list */}
+        <View style={styles.siteList}>
+          {unifiedCards.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>{t('Brak budow w tym dniu')}</Text>
+              <Text style={styles.emptySubtext}>{t('Dodaj budowe z poziomu FAB')}</Text>
+            </View>
+          ) : (
+            unifiedCards.map(card => (
+              <UnifiedSiteCard
+                key={card.siteId}
+                siteId={card.siteId}
+                siteName={card.siteName}
+                siteAddress={card.siteAddress}
+                siteStatus={card.siteStatus}
+                einsatzplanId={card.einsatzplanId}
+                mischgut={card.mischgut}
+                tonnenPlan={card.tonnenPlan}
+                tonnenReal={card.tonnenReal}
+                deliveryCount={card.deliveryCount}
+                deliveryTons={card.deliveryTons}
+                asphaltTypes={card.asphaltTypes}
+                onPress={() => onOpenSite(card.siteId, selectedKey)}
+                onUpdateReal={handleUpdateReal}
+                formatTons={formatTons}
+                t={t}
+              />
+            ))
+          )}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-    siteAddress: { fontSize: 13, fontFamily: FontFamily.regular, color: Colors.grayMid, marginBottom: 6 },
   container: { flex: 1, backgroundColor: Colors.cream },
+
   weekNav: {
     backgroundColor: Colors.orange,
     paddingHorizontal: Spacing.xl,
@@ -438,12 +422,9 @@ const styles = StyleSheet.create({
   },
   weekArrows: { flexDirection: 'row', gap: 8 },
   weekArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 32, height: 32, borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   weekArrowText: { color: '#fff', fontSize: 16, fontFamily: FontFamily.bold },
 
@@ -464,36 +445,13 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 10, fontFamily: FontFamily.bold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.5 },
   summaryDivider: { width: 1, alignSelf: 'stretch', backgroundColor: Colors.creamDark },
 
-  tabRow: {
-    flexDirection: 'row',
-    marginHorizontal: Spacing.lg,
-    marginTop: 12,
-    marginBottom: 4,
-    backgroundColor: Colors.cream,
-    borderRadius: 12,
-    padding: 3,
-    gap: 3,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  tabActive: {
-    backgroundColor: Colors.white,
-    ...Shadows.sm,
-  },
-  tabText: { fontSize: 13, fontFamily: FontFamily.bold, color: Colors.grayMid },
-  tabTextActive: { color: Colors.orange },
-
   scroll: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: 16, paddingBottom: 100 },
+
   daysGrid: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
     marginBottom: 16,
     justifyContent: 'space-between',
-    paddingHorizontal: 0,
   },
   dayChip: {
     flex: 1,
@@ -507,20 +465,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   dayChipToday: { borderColor: Colors.orangeLight },
-  dayChipActive: {
-    backgroundColor: Colors.orange,
-    borderColor: Colors.orange,
-    ...Shadows.sm,
-  },
-  dayName: {
-    fontSize: 9,
-    fontFamily: FontFamily.bold,
-    color: Colors.grayMid,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    width: '100%',
-  },
+  dayChipActive: { backgroundColor: Colors.orange, borderColor: Colors.orange, ...Shadows.sm },
+  dayName: { fontSize: 9, fontFamily: FontFamily.bold, color: Colors.grayMid, textTransform: 'uppercase', letterSpacing: 0.3, textAlign: 'center', width: '100%' },
   dayNameToday: { color: Colors.orange },
   dayNameActive: { color: 'rgba(255,255,255,0.75)' },
   dayNumber: { fontSize: 17, fontFamily: FontFamily.bold, color: Colors.black, lineHeight: 18 },
@@ -538,28 +484,6 @@ const styles = StyleSheet.create({
   dayDetailMeta: { fontSize: 12, fontFamily: FontFamily.bold, color: Colors.orange, backgroundColor: Colors.orangePale, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
 
   siteList: { gap: 10, paddingBottom: 100 },
-  siteCard: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.md,
-    padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.orange,
-    ...Shadows.sm,
-  },
-  siteCardInactive: { borderLeftColor: Colors.creamDark, opacity: 0.75 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  statusPill: { backgroundColor: Colors.greenBg, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 20 },
-  statusPillInactive: { backgroundColor: Colors.creamDark },
-  statusPillText: { fontSize: 9, fontFamily: FontFamily.bold, textTransform: 'uppercase', letterSpacing: 0.8, color: Colors.green },
-  statusPillTextInactive: { color: Colors.grayMid },
-  cardArrow: { color: Colors.grayMid, fontSize: 14 },
-  siteName: { fontSize: 18, fontFamily: FontFamily.bold, color: Colors.black, marginBottom: 10, letterSpacing: -0.2 },
-  siteTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag: { backgroundColor: Colors.cream, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 10 },
-  tagOrange: { backgroundColor: Colors.orangePale },
-  tagText: { fontSize: 11, fontFamily: FontFamily.semiBold, color: Colors.grayMid },
-  tagTextOrange: { color: Colors.orange, fontFamily: FontFamily.bold },
-
   emptyState: { paddingVertical: 28, alignItems: 'center' },
   emptyText: { fontSize: 15, fontFamily: FontFamily.semiBold, color: Colors.grayMid },
   emptySubtext: { fontSize: 12, fontFamily: FontFamily.medium, color: Colors.grayMid, marginTop: 6 },
