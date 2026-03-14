@@ -12,6 +12,10 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,7 +30,6 @@ import { useBaustellen } from '../../hooks/useBaustellen';
 // Components
 import PageHeader from '../../components/ui/PageHeader';
 import Card from '../../components/ui/Card';
-import StatusBadge from '../../components/ui/StatusBadge';
 import SectionTitle from '../../components/ui/SectionTitle';
 import FAB from '../../components/ui/FAB';
 
@@ -53,7 +56,33 @@ export default function SiteDetailScreen() {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { deleteSite } = useBaustellen();
+  const [editVisible, setEditVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const { deleteSite, updateSite } = useBaustellen();
+
+  const openEdit = () => {
+    if (!site) return;
+    setEditName(site.name);
+    setEditAddress(site.address ?? '');
+    setEditVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    const name = editName.trim();
+    if (!name || !siteId || typeof siteId !== 'string') return;
+    setIsSaving(true);
+    try {
+      await updateSite({ id: siteId, name, address: editAddress.trim() || undefined, status: 'active' });
+      await queryClient.invalidateQueries({ queryKey: ['construction-site', siteId] });
+      setEditVisible(false);
+    } catch (err) {
+      Alert.alert('Błąd', err instanceof Error ? err.message : 'Nie udało się zapisać zmian');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Fetch site details
   const { data: site, isLoading: siteLoading, error: siteError } = useQuery({
@@ -235,28 +264,26 @@ export default function SiteDetailScreen() {
             <Ionicons name="chevron-back" size={24} color={theme.colors.card} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
-            <StatusBadge
-              status="fza"
-              label={site.status === 'active' ? 'Aktywna' : 'Zakończona'}
-              size="sm"
-            />
             <Text style={styles.siteName}>{site.name}</Text>
           </View>
         </View>
-        <TouchableOpacity
-          onPress={handleDelete}
-          disabled={isDeleting}
-          style={[styles.deleteButton]}
-        >
-          {isDeleting ? (
-            <ActivityIndicator size="small" color={theme.colors.card} />
-          ) : (
-            <>
-              <Ionicons name="trash-outline" size={18} color={theme.colors.card} />
-              <Text style={styles.deleteButtonText}>Usuń</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity onPress={openEdit} style={styles.editButton}>
+            <Ionicons name="pencil-outline" size={18} color={theme.colors.card} />
+            <Text style={styles.editButtonText}>Edytuj</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleDelete}
+            disabled={isDeleting}
+            style={styles.deleteButton}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color={theme.colors.card} />
+            ) : (
+              <Ionicons name="trash-outline" size={20} color={theme.colors.card} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Summary Table - Fixed below header */}
@@ -392,6 +419,48 @@ export default function SiteDetailScreen() {
           icon="+"
         />
       </View>
+
+      {/* Edit Modal */}
+      <Modal visible={editVisible} animationType="slide" transparent onRequestClose={() => setEditVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setEditVisible(false)} />
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Edytuj budowę</Text>
+
+            <Text style={styles.fieldLabel}>Nazwa budowy</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Nazwa budowy"
+              placeholderTextColor={theme.colors.muted}
+            />
+
+            <Text style={styles.fieldLabel}>Adres</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={editAddress}
+              onChangeText={setEditAddress}
+              placeholder="Adres"
+              placeholderTextColor={theme.colors.muted}
+            />
+
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditVisible(false)}>
+                <Text style={styles.cancelBtnText}>Anuluj</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveBtn, (!editName.trim() || isSaving) && styles.saveBtnDisabled]}
+                onPress={handleSaveEdit}
+                disabled={!editName.trim() || isSaving}
+              >
+                <Text style={styles.saveBtnText}>{isSaving ? '⏳' : 'Zapisz'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -473,20 +542,78 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.card,
   },
-  deleteButton: {
+  editButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.sm,
-    backgroundColor: '#DC2626',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
     borderRadius: theme.radius.pill,
+  },
+  editButtonText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: '700',
+    color: theme.colors.card,
+  },
+  deleteButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DC2626',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   deleteButtonText: {
     fontSize: theme.fontSize.sm,
     fontWeight: '700',
     color: theme.colors.card,
   },
+  // modal
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalSheet: {
+    backgroundColor: theme.colors.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: theme.spacing.lg,
+    paddingBottom: 36,
+  },
+  modalTitle: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: '800',
+    color: theme.colors.dark,
+    marginBottom: theme.spacing.lg,
+  },
+  fieldLabel: {
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+    color: theme.colors.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+    marginBottom: 6,
+  },
+  fieldInput: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: theme.fontSize.md,
+    color: theme.colors.dark,
+    marginBottom: theme.spacing.md,
+  },
+  modalButtons: { flexDirection: 'row', gap: 12 },
+  cancelBtn: {
+    flex: 1, paddingVertical: 13, borderRadius: theme.radius.pill,
+    alignItems: 'center', backgroundColor: theme.colors.background,
+  },
+  cancelBtnText: { fontSize: theme.fontSize.md, fontWeight: '600', color: theme.colors.muted },
+  saveBtn: {
+    flex: 2, paddingVertical: 13, borderRadius: theme.radius.pill,
+    alignItems: 'center', backgroundColor: theme.colors.accent,
+  },
+  saveBtnDisabled: { opacity: 0.5 },
+  saveBtnText: { fontSize: theme.fontSize.md, fontWeight: '700', color: '#fff' },
 
   // Summary Table Styles
   summaryContainer: {

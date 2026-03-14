@@ -2,7 +2,7 @@
 // Delivery Detail Page — Szczegoly dostawy
 // =====================================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,14 @@ import {
   ActivityIndicator,
   ScrollView,
   Image,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 
 import { theme } from '../../constants/theme';
@@ -21,6 +26,15 @@ import { supabase } from '../../services/supabase';
 import Card from '../../components/ui/Card';
 import SectionTitle from '../../components/ui/SectionTitle';
 import { useI18n } from '../../i18n/I18nProvider';
+
+const ASPHALT_CLASSES = [
+  'AC 5 D S', 'AC 8 D S', 'AC 11 D S', 'AC 16 D S',
+  'AC 16 B S', 'AC 22 B S',
+  'AC 22 T S', 'AC 32 T S', 'AC 32 TN',
+  'SMA 5 S', 'SMA 8 S', 'SMA 11 S', 'SMA 16 S',
+  'MA 8 S', 'MA 11 S',
+  'PA 8', 'PA 11',
+];
 
 interface DeliveryDetailRow {
   id: string;
@@ -44,6 +58,66 @@ export default function DeliveryDetailScreen() {
   const router = useRouter();
   const { id: deliveryId } = useLocalSearchParams();
   const { t, language } = useI18n();
+  const queryClient = useQueryClient();
+
+  const [editVisible, setEditVisible] = useState(false);
+  const [editTons, setEditTons] = useState('');
+  const [editClass, setEditClass] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const openEdit = () => {
+    if (!delivery) return;
+    setEditTons(formatTons(delivery));
+    setEditClass(delivery.asphalt_type_name ?? '');
+    setEditVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!delivery || typeof deliveryId !== 'string') return;
+    const tons = parseFloat(editTons.replace(',', '.'));
+    if (!Number.isFinite(tons) || tons <= 0) {
+      Alert.alert('Błąd', 'Podaj prawidłową ilość ton');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      let asphaltTypeId = delivery.asphalt_type_id ?? null;
+      if (editClass !== delivery.asphalt_type_name && editClass && delivery.site_id) {
+        const { data: existing } = await supabase
+          .from('asphalt_types')
+          .select('id')
+          .eq('site_id', delivery.site_id)
+          .eq('name', editClass)
+          .single();
+        if (existing) {
+          asphaltTypeId = existing.id;
+        } else {
+          const { data: created, error: cErr } = await supabase
+            .from('asphalt_types')
+            .insert({ site_id: delivery.site_id, name: editClass })
+            .select('id')
+            .single();
+          if (cErr) throw cErr;
+          asphaltTypeId = created?.id ?? null;
+        }
+      }
+      const { error } = await supabase
+        .from('deliveries')
+        .update({ tons, asphalt_type_id: asphaltTypeId })
+        .eq('id', deliveryId);
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ['delivery-detail', deliveryId] });
+      await queryClient.invalidateQueries({ queryKey: ['site-deliveries', delivery.site_id] });
+      await queryClient.invalidateQueries({ queryKey: ['site-summary', delivery.site_id] });
+      await queryClient.invalidateQueries({ queryKey: ['baustellen'] });
+      await queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
+      setEditVisible(false);
+    } catch (err) {
+      Alert.alert('Błąd', err instanceof Error ? err.message : 'Nie udało się zapisać');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const { data: delivery, isLoading, error } = useQuery({
     queryKey: ['delivery-detail', deliveryId],
@@ -128,6 +202,10 @@ export default function DeliveryDetailScreen() {
             {asphaltName || t('Nieznany typ')}
           </Text>
         </View>
+        <TouchableOpacity onPress={openEdit} style={styles.editButton}>
+          <Ionicons name="pencil-outline" size={18} color={theme.colors.card} />
+          <Text style={styles.editButtonText}>Edytuj</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView}>
@@ -181,6 +259,54 @@ export default function DeliveryDetailScreen() {
 
         <View style={{ height: theme.spacing.xl }} />
       </ScrollView>
+
+      <Modal visible={editVisible} animationType="slide" transparent onRequestClose={() => setEditVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setEditVisible(false)} />
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Edytuj dostawę</Text>
+
+            <Text style={styles.fieldLabel}>Tony (t)</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={editTons}
+              onChangeText={setEditTons}
+              keyboardType="decimal-pad"
+              placeholder="0.0"
+              placeholderTextColor={theme.colors.muted}
+            />
+
+            <Text style={styles.fieldLabel}>Klasa asfaltu</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.classScroll} contentContainerStyle={styles.classScrollContent}>
+              {ASPHALT_CLASSES.map(cls => (
+                <TouchableOpacity
+                  key={cls}
+                  style={[styles.classChip, editClass === cls && styles.classChipSelected]}
+                  onPress={() => setEditClass(cls)}
+                >
+                  <Text style={[styles.classChipText, editClass === cls && styles.classChipTextSelected]}>{cls}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {editClass ? (
+              <Text style={styles.selectedClass}>Wybrano: <Text style={{ fontWeight: '800' }}>{editClass}</Text></Text>
+            ) : null}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditVisible(false)}>
+                <Text style={styles.cancelBtnText}>Anuluj</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
+                onPress={handleSaveEdit}
+                disabled={isSaving}
+              >
+                <Text style={styles.saveBtnText}>{isSaving ? '⏳' : 'Zapisz'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -323,4 +449,54 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     color: theme.colors.muted,
   },
+  editButton: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.pill,
+  },
+  editButtonText: { fontSize: theme.fontSize.sm, fontWeight: '700', color: theme.colors.card },
+  // modal
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalSheet: {
+    backgroundColor: theme.colors.card,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: theme.spacing.lg, paddingBottom: 36,
+  },
+  modalTitle: { fontSize: theme.fontSize.lg, fontWeight: '800', color: theme.colors.dark, marginBottom: theme.spacing.lg },
+  fieldLabel: {
+    fontSize: theme.fontSize.xs, fontWeight: '700', color: theme.colors.muted,
+    textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 6,
+  },
+  fieldInput: {
+    backgroundColor: theme.colors.background, borderRadius: theme.radius.md,
+    paddingVertical: 12, paddingHorizontal: 14,
+    fontSize: theme.fontSize.xl, fontWeight: '800', color: theme.colors.dark,
+    marginBottom: theme.spacing.md,
+  },
+  classScroll: { marginBottom: 8 },
+  classScrollContent: { gap: 8, paddingBottom: 4 },
+  classChip: {
+    paddingVertical: 7, paddingHorizontal: 12,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1, borderColor: theme.colors.border,
+  },
+  classChipSelected: { backgroundColor: theme.colors.accentLight, borderColor: theme.colors.accent },
+  classChipText: { fontSize: theme.fontSize.sm, fontWeight: '600', color: theme.colors.mid },
+  classChipTextSelected: { color: theme.colors.accent, fontWeight: '800' },
+  selectedClass: { fontSize: theme.fontSize.sm, color: theme.colors.muted, marginBottom: theme.spacing.lg },
+  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  cancelBtn: {
+    flex: 1, paddingVertical: 13, borderRadius: theme.radius.pill,
+    alignItems: 'center', backgroundColor: theme.colors.background,
+  },
+  cancelBtnText: { fontSize: theme.fontSize.md, fontWeight: '600', color: theme.colors.muted },
+  saveBtn: {
+    flex: 2, paddingVertical: 13, borderRadius: theme.radius.pill,
+    alignItems: 'center', backgroundColor: theme.colors.accent,
+  },
+  saveBtnDisabled: { opacity: 0.5 },
+  saveBtnText: { fontSize: theme.fontSize.md, fontWeight: '700', color: '#fff' },
 });

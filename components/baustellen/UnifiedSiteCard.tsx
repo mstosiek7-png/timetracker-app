@@ -13,7 +13,6 @@ interface Props {
   siteId: string;
   siteName: string;
   siteAddress?: string | null;
-  siteStatus?: string | null;
   // einsatzplan (opcjonalne)
   einsatzplanId?: string | null;
   mischgut?: string | null;
@@ -31,7 +30,7 @@ interface Props {
 }
 
 export default function UnifiedSiteCard({
-  siteName, siteAddress, siteStatus,
+  siteName, siteAddress,
   einsatzplanId, mischgut, tonnenPlan, tonnenReal,
   deliveryCount = 0, deliveryTons = 0, asphaltTypes = [],
   onPress, onUpdateReal, formatTons, t,
@@ -43,7 +42,6 @@ export default function UnifiedSiteCard({
   // Use delivery tons as "real" when no manual value is set
   const effectiveReal = tonnenReal ?? (deliveryTons > 0 ? deliveryTons : null);
   const diff = calcDiff(tonnenPlan ?? null, effectiveReal);
-  const isInactive = siteStatus !== 'active';
   const hasEinsatz = einsatzplanId != null;
   const hasDeliveries = deliveryCount > 0 || asphaltTypes.length > 0;
 
@@ -74,17 +72,12 @@ export default function UnifiedSiteCard({
 
   return (
     <TouchableOpacity
-      style={[styles.card, isInactive && styles.cardInactive]}
+      style={styles.card}
       onPress={onPress}
       activeOpacity={0.85}
     >
-      {/* Status pill + arrow */}
+      {/* Arrow */}
       <View style={styles.cardTop}>
-        <View style={[styles.statusPill, isInactive && styles.statusPillInactive]}>
-          <Text style={[styles.statusPillText, isInactive && styles.statusPillTextInactive]}>
-            {siteStatus === 'active' ? t('AKTYWNA') : t('ZAMKNIETA')}
-          </Text>
-        </View>
         <Text style={styles.cardArrow}>›</Text>
       </View>
 
@@ -196,12 +189,8 @@ const styles = StyleSheet.create({
     borderLeftColor: Colors.orange,
     ...Shadows.sm,
   },
-  cardInactive: { borderLeftColor: Colors.creamDark, opacity: 0.75 },
+
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  statusPill: { backgroundColor: Colors.greenBg, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 20 },
-  statusPillInactive: { backgroundColor: Colors.creamDark },
-  statusPillText: { fontSize: 9, fontFamily: FontFamily.bold, textTransform: 'uppercase', letterSpacing: 0.8, color: Colors.green },
-  statusPillTextInactive: { color: Colors.grayMid },
   cardArrow: { color: Colors.grayMid, fontSize: 14 },
 
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 },

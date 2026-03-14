@@ -251,13 +251,14 @@ export default function WeeklyView({
 
   // Summary bar
   const summary = useMemo(() => {
-    let totalTons = 0;
+    let deliveryTons = 0;
+    let planTons = 0;
     let deliveryCount = 0;
     const siteSet = new Set<string>();
 
     Object.values(dayBuckets).forEach(bucket => {
       bucket.deliveries.forEach(d => {
-        totalTons += d.tons;
+        deliveryTons += d.tons;
         deliveryCount += 1;
         siteSet.add(d.siteId);
       });
@@ -265,9 +266,12 @@ export default function WeeklyView({
     Object.values(daySites).forEach(bucket => {
       bucket.siteIds.forEach(id => siteSet.add(id));
     });
-    einsatzplanRows.forEach(ep => siteSet.add(ep.construction_site_id));
+    einsatzplanRows.forEach(ep => {
+      siteSet.add(ep.construction_site_id);
+      planTons += ep.tonnen_plan ?? 0;
+    });
 
-    return { totalTons, deliveryCount, siteCount: siteSet.size };
+    return { deliveryTons, planTons, deliveryCount, siteCount: siteSet.size };
   }, [dayBuckets, daySites, einsatzplanRows]);
 
   // Unified cards for selected day
@@ -291,7 +295,6 @@ export default function WeeklyView({
         siteId,
         siteName:    ep?.construction_sites?.name ?? site?.name ?? '—',
         siteAddress: ep?.construction_sites?.address ?? site?.address ?? null,
-        siteStatus:  site?.status ?? null,
         einsatzplanId: ep?.id ?? null,
         mischgut:    ep?.mischgut ?? null,
         tonnenPlan:  ep?.tonnen_plan ?? null,
@@ -335,18 +338,18 @@ export default function WeeklyView({
       {/* Summary bar */}
       <View style={styles.summaryBar}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{formatTons(summary.totalTons)}</Text>
-          <Text style={styles.summaryLabel}>{t('Tygodniowo (t)')}</Text>
+          <Text style={styles.summaryValue}>{formatTons(summary.planTons)}</Text>
+          <Text style={styles.summaryLabel}>{t('Plan (t)')}</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryValue, { color: Colors.green }]}>{formatTons(summary.deliveryTons)}</Text>
+          <Text style={styles.summaryLabel}>{t('Real (t)')}</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>{summary.siteCount}</Text>
           <Text style={styles.summaryLabel}>{t('Budow')}</Text>
-        </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{summary.deliveryCount}</Text>
-          <Text style={styles.summaryLabel}>{t('Dostaw')}</Text>
         </View>
       </View>
 
@@ -410,7 +413,6 @@ export default function WeeklyView({
                 siteId={card.siteId}
                 siteName={card.siteName}
                 siteAddress={card.siteAddress}
-                siteStatus={card.siteStatus}
                 einsatzplanId={card.einsatzplanId}
                 mischgut={card.mischgut}
                 tonnenPlan={card.tonnenPlan}

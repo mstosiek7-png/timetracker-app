@@ -206,6 +206,28 @@ export function useBaustellen() {
     },
   });
 
+  // ─── Update site ──────────────────────────────────────────
+  const updateSiteMutation = useMutation({
+    mutationFn: async (payload: { id: string; name: string; address?: string; status: 'active' | 'completed' }) => {
+      const { error } = await supabase
+        .from('construction_sites')
+        .update({ name: payload.name, address: payload.address ?? null, status: payload.status })
+        .eq('id', payload.id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.setQueryData(['baustellen'], (oldData: Site[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.map(s => s.id === variables.id
+          ? { ...s, name: variables.name, address: variables.address, active: variables.status === 'active' }
+          : s,
+        );
+      });
+      queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
+      queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
+    },
+  });
+
   // ─── Delete site ──────────────────────────────────────────
   const deleteSiteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -242,6 +264,7 @@ export function useBaustellen() {
     getSite,
     addDelivery: addDeliveryMutation.mutateAsync,
     createSite: createSiteMutation.mutateAsync,
+    updateSite: updateSiteMutation.mutateAsync,
     deleteSite: async (id: string) => {
       try {
         console.log('Starting delete for site:', id);
