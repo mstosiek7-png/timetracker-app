@@ -13,7 +13,7 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://dvikqvpvbqlfdriwutto.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2aWtxdnB2YnFsZmRyaXd1dHRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTgxMzUsImV4cCI6MjA4NjY5NDEzNX0.AvIB2500cgdATiizU6HAhuZu-xXIDY28nZ5Laheq-kg",
-        "EXPO_PUBLIC_LITELLM_PROXY_URL": "https://triumphant-fascination-production.up.railway.app",
+        "EXPO_PUBLIC_LITELLM_PROXY_URL": "https://lite-llm-production-4e36.up.railway.app",
         "EXPO_PUBLIC_LITELLM_KEY": "sk-omi-master-key-xyz"
       }
     },
