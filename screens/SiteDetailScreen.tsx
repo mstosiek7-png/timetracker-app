@@ -5,7 +5,7 @@
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, StatusBar, Alert,
+  StyleSheet, StatusBar, Alert, Modal, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,11 +23,40 @@ type Props = {
 
 export default function SiteDetailScreen({ navigation, route }: Props) {
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [editVisible, setEditVisible] = React.useState(false);
+  const [editName, setEditName] = React.useState('');
+  const [editAddress, setEditAddress] = React.useState('');
+  const [editStatus, setEditStatus] = React.useState<'active' | 'completed'>('active');
+  const [isSaving, setIsSaving] = React.useState(false);
+
   const siteId = route.params?.siteId;
   const mischgut = route.params?.mischgut as string | undefined;
-  const { getSite, deleteSite } = useBaustellen();
+  const { getSite, deleteSite, updateSite } = useBaustellen();
   const site = getSite(siteId);
   const { t, language } = useI18n();
+
+  const openEdit = () => {
+    if (!site) return;
+    setEditName(site.name);
+    setEditAddress(site.address ?? '');
+    setEditStatus(site.active ? 'active' : 'completed');
+    setEditVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    const name = editName.trim();
+    if (!name) return;
+    setIsSaving(true);
+    try {
+      await updateSite({ id: siteId, name, address: editAddress.trim() || undefined, status: editStatus });
+      setEditVisible(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t('Nieznany blad');
+      Alert.alert(t('Blad'), msg);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (!site) return null;
 
@@ -66,13 +95,18 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
   };
 
   const HeaderRight = (
-    <TouchableOpacity 
-      style={[styles.deleteBtn, isDeleting && styles.deleteBtnDisabled]} 
-      onPress={handleDelete}
-      disabled={isDeleting}
-    >
-      <Text style={styles.deleteBtnText}>{isDeleting ? '⏳' : '🗑'} {t('Usun')}</Text>
-    </TouchableOpacity>
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      <TouchableOpacity style={styles.editBtn} onPress={openEdit}>
+        <Text style={styles.editBtnText}>{t('Edytuj')}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.deleteBtn, isDeleting && styles.deleteBtnDisabled]}
+        onPress={handleDelete}
+        disabled={isDeleting}
+      >
+        <Text style={styles.deleteBtnText}>{isDeleting ? '⏳' : '🗑'}</Text>
+      </TouchableOpacity>
+    </View>
   );
 
   const todayLabel = new Date().toLocaleDateString(language === 'de' ? 'de-DE' : 'pl-PL', { weekday: 'short', day:'2-digit', month:'2-digit', year:'numeric' });
@@ -152,6 +186,67 @@ export default function SiteDetailScreen({ navigation, route }: Props) {
       </View>
 
       <BottomNav active="Baustellen" onNavigate={(s) => navigation.navigate(s)} />
+
+      {/* ─── Edit Modal ─────────────────────────────────────── */}
+      <Modal visible={editVisible} animationType="slide" transparent onRequestClose={() => setEditVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setEditVisible(false)} />
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>{t('Edytuj')} — {site?.name}</Text>
+
+            <Text style={styles.fieldLabel}>{t('Nazwa budowy')}</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder={t('Nazwa budowy')}
+              placeholderTextColor={Colors.grayLight}
+            />
+
+            <Text style={styles.fieldLabel}>{t('Adres')}</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={editAddress}
+              onChangeText={setEditAddress}
+              placeholder={t('Adres')}
+              placeholderTextColor={Colors.grayLight}
+            />
+
+            <Text style={styles.fieldLabel}>{t('Status')}</Text>
+            <View style={styles.statusRow}>
+              <TouchableOpacity
+                style={[styles.statusChip, editStatus === 'active' && styles.statusChipActive]}
+                onPress={() => setEditStatus('active')}
+              >
+                <Text style={[styles.statusChipText, editStatus === 'active' && styles.statusChipTextActive]}>
+                  {t('AKTYWNA')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.statusChip, editStatus === 'completed' && styles.statusChipCompleted]}
+                onPress={() => setEditStatus('completed')}
+              >
+                <Text style={[styles.statusChipText, editStatus === 'completed' && styles.statusChipTextActive]}>
+                  {t('ZAMKNIETA')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditVisible(false)}>
+                <Text style={styles.cancelBtnText}>{t('Anuluj')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveBtn, (!editName.trim() || isSaving) && styles.saveBtnDisabled]}
+                onPress={handleSaveEdit}
+                disabled={!editName.trim() || isSaving}
+              >
+                <Text style={styles.saveBtnText}>{isSaving ? '⏳' : t('Zapisz')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -224,4 +319,52 @@ const styles = StyleSheet.create({
     ...Shadows.orange,
   },
   addDeliveryText: { color: '#fff', fontFamily: FontFamily.semiBold, fontSize: FontSize.md },
+  editBtn: {
+    backgroundColor: Colors.orangePale, borderRadius: Radius.pill,
+    paddingVertical: 7, paddingHorizontal: 14,
+  },
+  editBtnText: { color: Colors.orange, fontFamily: FontFamily.semiBold, fontSize: FontSize.base },
+  // modal
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  modalSheet: {
+    backgroundColor: Colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: Spacing.lg, paddingBottom: 36, ...Shadows.lg,
+  },
+  modalTitle: {
+    fontSize: FontSize.lg, fontFamily: FontFamily.bold, color: Colors.black,
+    marginBottom: Spacing.lg,
+  },
+  fieldLabel: {
+    fontSize: FontSize.xs, fontFamily: FontFamily.bold, color: Colors.grayMid,
+    textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 6,
+  },
+  fieldInput: {
+    backgroundColor: Colors.cream, borderRadius: Radius.sm,
+    paddingVertical: 12, paddingHorizontal: 14,
+    fontSize: FontSize.md, fontFamily: FontFamily.regular, color: Colors.black,
+    marginBottom: Spacing.md,
+  },
+  statusRow: { flexDirection: 'row', gap: 10, marginBottom: Spacing.lg },
+  statusChip: {
+    flex: 1, paddingVertical: 10, borderRadius: Radius.pill,
+    alignItems: 'center', backgroundColor: Colors.cream,
+    borderWidth: 1, borderColor: Colors.cream,
+  },
+  statusChipActive: { backgroundColor: Colors.greenBg, borderColor: Colors.green },
+  statusChipCompleted: { backgroundColor: Colors.grayLight + '30', borderColor: Colors.grayMid },
+  statusChipText: { fontSize: FontSize.sm, fontFamily: FontFamily.semiBold, color: Colors.grayMid },
+  statusChipTextActive: { color: Colors.black },
+  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  cancelBtn: {
+    flex: 1, paddingVertical: 13, borderRadius: Radius.pill,
+    alignItems: 'center', backgroundColor: Colors.cream,
+  },
+  cancelBtnText: { fontSize: FontSize.md, fontFamily: FontFamily.semiBold, color: Colors.grayMid },
+  saveBtn: {
+    flex: 2, paddingVertical: 13, borderRadius: Radius.pill,
+    alignItems: 'center', backgroundColor: Colors.orange, ...Shadows.orange,
+  },
+  saveBtnDisabled: { opacity: 0.5 },
+  saveBtnText: { fontSize: FontSize.md, fontFamily: FontFamily.semiBold, color: '#fff' },
 });
