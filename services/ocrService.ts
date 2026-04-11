@@ -105,7 +105,7 @@ export async function runEinsatzplanOcr(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), OCR_TIMEOUT_MS);
 
-    const response = await fetch(`${PROXY_URL}/v1/chat/completions`, {
+    const response = await fetch(`${PROXY_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
