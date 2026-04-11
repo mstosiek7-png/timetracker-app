@@ -1,5 +1,7 @@
 // =====================================================
 // EinsatzplanImportModal — OCR import flow
+// Step 1: scan & auto-save immediately
+// Step 2: review/correct name, address, tons
 // =====================================================
 import React, { useState, useRef } from 'react';
 import {
@@ -22,12 +24,17 @@ import { Colors, Spacing, FontFamily, Radius, Shadows } from '../theme';
 import { useI18n } from '../i18n/I18nProvider';
 import { EinsatzplanOcrDay, EinsatzplanOcrResult } from '../types/models';
 
-type Step = 'idle' | 'loading' | 'preview' | 'saving';
+type Step = 'idle' | 'loading' | 'review' | 'saving';
 
-interface DayState extends EinsatzplanOcrDay {
-  matchedSiteId: string | null;
-  matchedSiteName: string | null;
-  matchScore: number;
+interface SavedRow {
+  einsatzplanId: string;
+  constructionSiteId: string;
+  date: string;
+  siteName: string;
+  siteAddress: string | null;
+  tonnenPlan: number | null;
+  mischgut: string | null;
+  isNew: boolean; // was auto-created
 }
 
 interface Props {
@@ -39,12 +46,12 @@ interface Props {
 const PROGRESS_MESSAGES_PL = [
   'Analizuję Einsatzplan...',
   'Rozpoznawanie tekstu...',
-  'Przygotowuję podgląd...',
+  'Zapisuję dane...',
 ];
 const PROGRESS_MESSAGES_DE = [
   'Einsatzplan wird analysiert...',
   'Text wird erkannt...',
-  'Vorschau wird vorbereitet...',
+  'Daten werden gespeichert...',
 ];
 
 export default function EinsatzplanImportModal({ visible, onClose, onImported }: Props) {
@@ -53,14 +60,12 @@ export default function EinsatzplanImportModal({ visible, onClose, onImported }:
 
   const [step, setStep] = useState<Step>('idle');
   const [progressMsg, setProgressMsg] = useState('');
-  const [ocrResult, setOcrResult] = useState<EinsatzplanOcrResult | null>(null);
-  const [documentId, setDocumentId] = useState<string | null>(null);
-  const [days, setDays] = useState<DayState[]>([]);
-  const [activeSites, setActiveSites] = useState<{ id: string; name: string }[]>([]);
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
-  const [editField, setEditField] = useState<{ key: keyof EinsatzplanOcrDay; value: string } | null>(null);
-  const progressMsgs = language === 'de' ? PROGRESS_MESSAGES_DE : PROGRESS_MESSAGES_PL;
+  const [savedRows, setSavedRows] = useState<SavedRow[]>([]);
+  const [firstDate, setFirstDate] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<{ rowIdx: number; field: 'name' | 'address' | 'tons'; value: string } | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const progressMsgs = language === 'de' ? PROGRESS_MESSAGES_DE : PROGRESS_MESSAGES_PL;
 
   function startProgressMessages() {
     let idx = 0;
@@ -106,65 +111,21 @@ export default function EinsatzplanImportModal({ visible, onClose, onImported }:
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id ?? '';
 
+      // 1. OCR
       const { result: parsed, documentId: docId } = await runEinsatzplanOcr(imageUri, userId);
 
-      // Load active sites for matching
-      const { data: sites } = await supabase
-        .from('construction_sites')
-        .select('id, name')
-        .eq('status', 'active');
-      setActiveSites(sites ?? []);
-
-      // Match sites for each day
-      const dayStates: DayState[] = await Promise.all(
-        parsed.days.map(async (day) => {
-          const match = await matchSite(day.kostenstelle);
-          return {
-            ...day,
-            matchedSiteId: match?.siteId ?? null,
-            matchedSiteName: match?.siteName ?? null,
-            matchScore: match?.score ?? 0,
-          };
-        }),
-      );
-
-      setOcrResult(parsed);
-      setDocumentId(docId);
-      setDays(dayStates);
-      stopProgressMessages();
-      setStep('preview');
-    } catch (err) {
-      stopProgressMessages();
-      setStep('idle');
-      const msg =
-        err instanceof OcrError
-          ? err.message
-          : t('Nie udalo sie wygenerowac raportu.');
-      Alert.alert(t('Blad'), msg, [
-        { text: t('Anuluj'), style: 'cancel' },
-        { text: t('Sprobuj ponownie'), onPress: handleImport },
-      ]);
-    }
-  }
-
-  async function handleConfirm() {
-    if (!ocrResult || !documentId) return;
-    setStep('saving');
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id ?? '';
-
+      // 2. Match or auto-create sites
       const siteMatches: Record<string, string> = {};
+      const siteIsNew: Record<string, boolean> = {};
 
-      for (const day of days) {
+      for (const day of parsed.days) {
         if (siteMatches[day.kostenstelle]) continue;
 
-        if (day.matchedSiteId) {
-          siteMatches[day.kostenstelle] = day.matchedSiteId;
+        const match = await matchSite(day.kostenstelle);
+        if (match?.siteId) {
+          siteMatches[day.kostenstelle] = match.siteId;
+          siteIsNew[day.kostenstelle] = false;
         } else {
-          // No match — auto-create a new construction site from OCR data
-          console.log('[Import] Auto-creating site:', day.kostenstelle, day.adresse);
           const { data: newSite, error } = await supabase
             .from('construction_sites')
             .insert({
@@ -175,48 +136,139 @@ export default function EinsatzplanImportModal({ visible, onClose, onImported }:
             })
             .select('id')
             .single();
-
           if (error) throw new Error(`Nie udało się utworzyć budowy "${day.kostenstelle}": ${error.message}`);
-          if (newSite) siteMatches[day.kostenstelle] = newSite.id;
+          if (newSite) {
+            siteMatches[day.kostenstelle] = newSite.id;
+            siteIsNew[day.kostenstelle] = true;
+          }
         }
       }
-      await saveEinsatzplanRows(ocrResult, documentId, userId, siteMatches);
+
+      // 3. Save einsatzplan rows
+      await saveEinsatzplanRows(parsed, docId, userId, siteMatches);
+
+      // 4. Fetch saved rows for review
+      const siteIds = Object.values(siteMatches);
+      const dates = parsed.days.map(d => d.date).filter(Boolean);
+
+      const { data: epRows } = await supabase
+        .from('einsatzplan')
+        .select('id, date, construction_site_id, mischgut, tonnen_plan, construction_sites(name, address)')
+        .in('construction_site_id', siteIds)
+        .in('date', dates);
+
+      const rows: SavedRow[] = (epRows ?? []).map((r: any) => ({
+        einsatzplanId: r.id,
+        constructionSiteId: r.construction_site_id,
+        date: r.date,
+        siteName: Array.isArray(r.construction_sites) ? r.construction_sites[0]?.name : r.construction_sites?.name,
+        siteAddress: Array.isArray(r.construction_sites) ? r.construction_sites[0]?.address : r.construction_sites?.address,
+        tonnenPlan: r.tonnen_plan,
+        mischgut: r.mischgut,
+        isNew: siteIsNew[parsed.days.find(d => siteMatches[d.kostenstelle] === r.construction_site_id)?.kostenstelle ?? ''] ?? false,
+      }));
+
+      rows.sort((a, b) => a.date.localeCompare(b.date));
+
+      queryClient.invalidateQueries({ queryKey: ['einsatzplan-week'] });
+      queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
+      queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
+
+      stopProgressMessages();
+      setSavedRows(rows);
+      setFirstDate(parsed.days[0]?.date ?? null);
+      setStep('review');
+    } catch (err) {
+      stopProgressMessages();
+      setStep('idle');
+      const msg = err instanceof OcrError ? err.message : t('Nie udalo sie wygenerowac raportu.');
+      Alert.alert(t('Blad'), msg, [
+        { text: t('Anuluj'), style: 'cancel' },
+        { text: t('Sprobuj ponownie'), onPress: handleImport },
+      ]);
+    }
+  }
+
+  function updateRow(idx: number, fields: Partial<SavedRow>) {
+    setSavedRows(prev => prev.map((r, i) => i === idx ? { ...r, ...fields } : r));
+  }
+
+  async function handleSaveCorrections() {
+    setStep('saving');
+    try {
+      for (const row of savedRows) {
+        await Promise.all([
+          supabase
+            .from('construction_sites')
+            .update({ name: row.siteName, address: row.siteAddress })
+            .eq('id', row.constructionSiteId),
+          supabase
+            .from('einsatzplan')
+            .update({ tonnen_plan: row.tonnenPlan })
+            .eq('id', row.einsatzplanId),
+        ]);
+      }
       queryClient.invalidateQueries({ queryKey: ['einsatzplan-week'] });
       queryClient.invalidateQueries({ queryKey: ['baustellen-week'] });
       queryClient.invalidateQueries({ queryKey: ['construction-sites'] });
       setStep('idle');
-      const firstDate = ocrResult.days[0]?.date;
       if (firstDate) onImported?.(firstDate);
       else onClose();
     } catch (err: any) {
-      console.error('[Import] handleConfirm error:', err?.message, err);
-      setStep('preview');
+      setStep('review');
       Alert.alert(t('Blad'), err?.message ?? t('Nie udalo sie zapisac wpisow'));
     }
+  }
+
+  function handleSkipCorrections() {
+    setStep('idle');
+    setSavedRows([]);
+    if (firstDate) onImported?.(firstDate);
+    else onClose();
   }
 
   function handleCancel() {
     stopProgressMessages();
     setStep('idle');
-    setOcrResult(null);
-    setDocumentId(null);
-    setDays([]);
+    setSavedRows([]);
+    setFirstDate(null);
+    setEditingField(null);
     onClose();
   }
 
-  function updateDayField(idx: number, field: keyof EinsatzplanOcrDay, value: string | number | null) {
-    setDays((prev) =>
-      prev.map((d, i) => (i === idx ? { ...d, [field]: value } : d)),
-    );
+  function commitEdit() {
+    if (!editingField) return;
+    const { rowIdx, field, value } = editingField;
+    if (field === 'name') updateRow(rowIdx, { siteName: value });
+    else if (field === 'address') updateRow(rowIdx, { siteAddress: value || null });
+    else if (field === 'tons') {
+      const v = parseFloat(value.replace(',', '.'));
+      updateRow(rowIdx, { tonnenPlan: isNaN(v) ? null : v });
+    }
+    setEditingField(null);
   }
 
-  function assignSite(dayIdx: number, siteId: string, siteName: string) {
-    setDays((prev) =>
-      prev.map((d, i) =>
-        i === dayIdx
-          ? { ...d, matchedSiteId: siteId, matchedSiteName: siteName, matchScore: 1.0 }
-          : d,
-      ),
+  function renderEditableField(rowIdx: number, field: 'name' | 'address' | 'tons', displayValue: string, placeholder?: string) {
+    const isEditing = editingField?.rowIdx === rowIdx && editingField?.field === field;
+    if (isEditing) {
+      return (
+        <TextInput
+          style={styles.fieldInput}
+          value={editingField!.value}
+          onChangeText={v => setEditingField({ rowIdx, field, value: v })}
+          keyboardType={field === 'tons' ? 'decimal-pad' : 'default'}
+          onBlur={commitEdit}
+          autoFocus
+          placeholder={placeholder}
+        />
+      );
+    }
+    return (
+      <TouchableOpacity onPress={() => setEditingField({ rowIdx, field, value: displayValue })}>
+        <Text style={[styles.fieldValue, styles.editable]}>
+          {displayValue || <Text style={styles.fieldPlaceholder}>{placeholder ?? '—'}</Text>}
+        </Text>
+      </TouchableOpacity>
     );
   }
 
@@ -229,14 +281,14 @@ export default function EinsatzplanImportModal({ visible, onClose, onImported }:
             <Text style={styles.backBtnText}>‹</Text>
           </TouchableOpacity>
           <Text style={styles.title}>
-            {step === 'preview' && ocrResult
-              ? `${t('Podglad importu')} KW${ocrResult.kw}`
+            {step === 'review'
+              ? (language === 'de' ? 'Importiert — Korrekturen' : 'Zaimportowano — Korekty')
               : t('Importuj plan')}
           </Text>
           <View style={{ width: 32 }} />
         </View>
 
-        {/* Loading step */}
+        {/* Loading */}
         {(step === 'loading' || step === 'saving') && (
           <View style={styles.loadingState}>
             <ActivityIndicator size="large" color={Colors.orange} />
@@ -244,7 +296,7 @@ export default function EinsatzplanImportModal({ visible, onClose, onImported }:
           </View>
         )}
 
-        {/* Idle step */}
+        {/* Idle */}
         {step === 'idle' && (
           <View style={styles.idleState}>
             <Text style={styles.idleIcon}>📋</Text>
@@ -260,149 +312,66 @@ export default function EinsatzplanImportModal({ visible, onClose, onImported }:
           </View>
         )}
 
-        {/* Preview step */}
-        {step === 'preview' && (
+        {/* Review / corrections */}
+        {step === 'review' && (
           <>
+            <View style={styles.reviewBanner}>
+              <Text style={styles.reviewBannerText}>
+                ✅  {language === 'de'
+                  ? `${savedRows.length} Einträge importiert. Korrekturen möglich:`
+                  : `${savedRows.length} wpisów zapisanych. Możesz poprawić:`}
+              </Text>
+            </View>
+
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-              {days.map((day, idx) => {
-                const lowConf = day.confidence < 0.8;
-                return (
-                  <View
-                    key={`${day.date}-${idx}`}
-                    style={[styles.dayCard, lowConf && styles.dayCardWarning]}
-                  >
-                    {lowConf && (
-                      <Text style={styles.warningBadge}>⚠️  {language === 'de' ? 'Niedrige Erkennungsgenauigkeit' : 'Niska pewność rozpoznania'}</Text>
-                    )}
+              {savedRows.map((row, idx) => (
+                <View key={row.einsatzplanId} style={[styles.dayCard, row.isNew && styles.dayCardNew]}>
+                  {row.isNew && (
+                    <Text style={styles.newBadge}>
+                      {language === 'de' ? '✦ Neue Baustelle' : '✦ Nowa budowa'}
+                    </Text>
+                  )}
 
-                    {/* Date */}
-                    <View style={styles.fieldRow}>
-                      <Text style={styles.fieldLabel}>{t('Data')}</Text>
-                      <Text style={styles.fieldValue}>{day.date}</Text>
-                    </View>
+                  <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>{t('Data')}</Text>
+                    <Text style={styles.fieldValue}>{row.date}</Text>
+                  </View>
 
-                    {/* Kostenstelle + Adresse */}
-                    <View style={styles.fieldRow}>
-                      <Text style={styles.fieldLabel}>{t('Kostenstelle')}</Text>
-                      <Text style={styles.fieldValue}>{day.kostenstelle}</Text>
-                    </View>
-                    {day.adresse ? (
-                      <View style={styles.fieldRow}>
-                        <Text style={styles.fieldLabel}>{t('Adres')}</Text>
-                        <Text style={styles.fieldValue}>{day.adresse}</Text>
-                      </View>
-                    ) : null}
+                  <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>{language === 'de' ? 'Baustelle' : 'Budowa'}</Text>
+                    {renderEditableField(idx, 'name', row.siteName, 'Nazwa budowy')}
+                  </View>
 
-                    {/* Mischgut */}
+                  <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>{t('Adres')}</Text>
+                    {renderEditableField(idx, 'address', row.siteAddress ?? '', 'Adres')}
+                  </View>
+
+                  <View style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>{t('Plan')} (t)</Text>
+                    {renderEditableField(idx, 'tons', row.tonnenPlan !== null ? String(row.tonnenPlan) : '', 'np. 350')}
+                  </View>
+
+                  {row.mischgut ? (
                     <View style={styles.fieldRow}>
                       <Text style={styles.fieldLabel}>{t('Klasa asfaltu')}</Text>
-                      {editingIdx === idx && editField?.key === 'mischgut' ? (
-                        <TextInput
-                          style={styles.fieldInput}
-                          value={editField.value}
-                          onChangeText={(v) => setEditField({ key: 'mischgut', value: v })}
-                          onBlur={() => {
-                            updateDayField(idx, 'mischgut', editField!.value || null);
-                            setEditingIdx(null);
-                            setEditField(null);
-                          }}
-                          autoFocus
-                        />
-                      ) : (
-                        <TouchableOpacity onPress={() => { setEditingIdx(idx); setEditField({ key: 'mischgut', value: day.mischgut ?? '' }); }}>
-                          <Text style={[styles.fieldValue, styles.editable]}>{day.mischgut || '—'}</Text>
-                        </TouchableOpacity>
-                      )}
+                      <Text style={styles.fieldValue}>{row.mischgut}</Text>
                     </View>
-
-                    {/* Tonnen Plan */}
-                    <View style={styles.fieldRow}>
-                      <Text style={styles.fieldLabel}>{t('Plan')} (t)</Text>
-                      {editingIdx === idx && editField?.key === 'tonnen_plan' ? (
-                        <TextInput
-                          style={styles.fieldInput}
-                          value={editField.value}
-                          onChangeText={(v) => setEditField({ key: 'tonnen_plan', value: v })}
-                          keyboardType="decimal-pad"
-                          onBlur={() => {
-                            const val = parseFloat(editField!.value.replace(',', '.'));
-                            updateDayField(idx, 'tonnen_plan', isNaN(val) ? null : val);
-                            setEditingIdx(null);
-                            setEditField(null);
-                          }}
-                          autoFocus
-                        />
-                      ) : (
-                        <TouchableOpacity onPress={() => { setEditingIdx(idx); setEditField({ key: 'tonnen_plan', value: day.tonnen_plan !== null ? String(day.tonnen_plan) : '' }); }}>
-                          <Text style={[styles.fieldValue, styles.editable]}>
-                            {day.tonnen_plan !== null ? `${day.tonnen_plan} t` : '—'}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-
-                    {/* Site match */}
-                    <View style={styles.matchRow}>
-                      {day.matchedSiteId ? (
-                        <Text style={day.matchScore < 0.5 ? styles.matchWeak : styles.matchOk}>
-                          {day.matchScore < 0.5 ? '⚠️  ' : '✓  '}{day.matchedSiteName}
-                          {day.matchScore < 0.5 ? (language === 'de' ? ' (unsicher)' : ' (niepewne)') : ''}
-                        </Text>
-                      ) : (
-                        <Text style={styles.matchNew}>
-                          ➕  {language === 'de' ? `Wird neu erstellt: ${day.kostenstelle}` : `Zostanie utworzona: ${day.kostenstelle}`}
-                        </Text>
-                      )}
-                      {activeSites.length > 0 && (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.siteChips}>
-                          {activeSites.map((site) => (
-                            <TouchableOpacity
-                              key={site.id}
-                              style={[styles.siteChip, day.matchedSiteId === site.id && styles.siteChipActive]}
-                              onPress={() => assignSite(idx, site.id, site.name)}
-                            >
-                              <Text style={[styles.siteChipText, day.matchedSiteId === site.id && styles.siteChipTextActive]}>
-                                {site.name}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </ScrollView>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
+                  ) : null}
+                </View>
+              ))}
+              <View style={{ height: 120 }} />
             </ScrollView>
 
-            {/* Bottom actions */}
             <View style={styles.bottomBar}>
-              {(() => {
-                const matched = days.filter(d => d.matchedSiteId).length;
-                const total = days.length;
-                const skipped = total - matched;
-                return (
-                  <View style={{ flex: 1, gap: 10 }}>
-                    {skipped > 0 && (
-                      <Text style={styles.importSummary}>
-                        {language === 'de'
-                          ? `${matched} von ${total} werden importiert · ${skipped} übersprungen`
-                          : `${matched} z ${total} zostanie zapisanych · ${skipped} pominięte`}
-                      </Text>
-                    )}
-                    <View style={styles.bottomBtns}>
-                      <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
-                        <Text style={styles.cancelBtnText}>{t('Anuluj')}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.confirmBtn}
-                        onPress={handleConfirm}
-                      >
-                        <Text style={styles.confirmBtnText}>{t('Zatwierdz i importuj')}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })()}
+              <View style={styles.bottomBtns}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={handleSkipCorrections}>
+                  <Text style={styles.cancelBtnText}>{language === 'de' ? 'Überspringen' : 'Pomiń'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.confirmBtn} onPress={handleSaveCorrections}>
+                  <Text style={styles.confirmBtnText}>{language === 'de' ? 'Korrekturen speichern' : 'Zapisz korekty'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </>
         )}
@@ -442,8 +411,17 @@ const styles = StyleSheet.create({
   },
   importBtnText: { fontSize: 15, fontFamily: FontFamily.bold, color: '#fff' },
 
+  reviewBanner: {
+    backgroundColor: '#e8f5e9',
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: '#c8e6c9',
+  },
+  reviewBannerText: { fontSize: 13, fontFamily: FontFamily.bold, color: '#2d9a5c' },
+
   scroll: { flex: 1 },
-  scrollContent: { padding: Spacing.lg, gap: 12, paddingBottom: 120 },
+  scrollContent: { padding: Spacing.lg, gap: 12 },
 
   dayCard: {
     backgroundColor: Colors.white,
@@ -451,15 +429,16 @@ const styles = StyleSheet.create({
     padding: 16,
     borderLeftWidth: 4,
     borderLeftColor: Colors.orange,
-    gap: 8,
+    gap: 10,
     ...Shadows.sm,
   },
-  dayCardWarning: { borderLeftColor: '#f97316' },
-  warningBadge: { fontSize: 12, fontFamily: FontFamily.bold, color: '#f97316', marginBottom: 4 },
+  dayCardNew: { borderLeftColor: '#2d9a5c' },
+  newBadge: { fontSize: 11, fontFamily: FontFamily.bold, color: '#2d9a5c', marginBottom: 2 },
 
-  fieldRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  fieldRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 28 },
   fieldLabel: { fontSize: 12, fontFamily: FontFamily.bold, color: Colors.grayMid, flex: 1 },
   fieldValue: { fontSize: 14, fontFamily: FontFamily.bold, color: Colors.black, flex: 2, textAlign: 'right' },
+  fieldPlaceholder: { color: Colors.grayMid, fontFamily: FontFamily.medium },
   editable: { color: Colors.orange, textDecorationLine: 'underline' },
   fieldInput: {
     flex: 2,
@@ -472,25 +451,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
 
-  matchRow: { marginTop: 4 },
-  matchOk: { fontSize: 12, fontFamily: FontFamily.bold, color: '#22c55e', marginBottom: 6 },
-  matchWeak: { fontSize: 12, fontFamily: FontFamily.bold, color: '#f97316', marginBottom: 6 },
-  matchNew: { fontSize: 12, fontFamily: FontFamily.bold, color: Colors.orange, marginBottom: 6 },
-  matchWarning: { fontSize: 12, fontFamily: FontFamily.bold, color: Colors.grayMid, marginBottom: 8 },
-  siteChips: { flexGrow: 0 },
-  siteChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: Colors.orange,
-    marginRight: 8,
-    backgroundColor: Colors.white,
-  },
-  siteChipActive: { backgroundColor: Colors.orange },
-  siteChipText: { fontSize: 12, fontFamily: FontFamily.bold, color: Colors.orange },
-  siteChipTextActive: { color: '#fff' },
-
   bottomBar: {
     position: 'absolute',
     bottom: 0,
@@ -500,12 +460,6 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderTopWidth: 1,
     borderTopColor: Colors.creamDark,
-  },
-  importSummary: {
-    fontSize: 12,
-    fontFamily: FontFamily.medium,
-    color: Colors.grayMid,
-    textAlign: 'center',
   },
   bottomBtns: { flexDirection: 'row', gap: 12 },
   cancelBtn: {
@@ -523,6 +477,5 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.orange,
     alignItems: 'center',
   },
-  confirmBtnDisabled: { backgroundColor: Colors.creamDark },
   confirmBtnText: { fontSize: 15, fontFamily: FontFamily.bold, color: '#fff' },
 });
