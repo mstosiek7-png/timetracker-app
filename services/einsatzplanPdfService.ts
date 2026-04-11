@@ -190,19 +190,48 @@ export async function generateEinsatzplanPdf(
   const toStr   = format(dateTo,   'yyyy-MM-dd');
   console.log('[PDF] querying einsatzplan from', fromStr, 'to', toStr);
 
-  const { data, error } = await supabase
-    .from('einsatzplan')
-    .select(
-      `date, kw, year, mischgut, tonnen_plan, tonnen_real,
-       construction_sites ( name, address )`,
-    )
-    .gte('date', fromStr)
-    .lte('date', toStr)
-    .order('date');
+  const [{ data: epData, error: epError }, { data: delData, error: delError }] = await Promise.all([
+    supabase
+      .from('einsatzplan')
+      .select(`date, kw, year, mischgut, tonnen_plan, tonnen_real, construction_sites ( name, address )`)
+      .gte('date', fromStr)
+      .lte('date', toStr)
+      .order('date'),
+    supabase
+      .from('deliveries')
+      .select(`delivery_time, tons, asphalt_type_id, construction_sites ( name, address )`)
+      .gte('delivery_time', fromStr)
+      .lte('delivery_time', toStr + 'T23:59:59')
+      .order('delivery_time'),
+  ]);
 
-  console.log('[PDF] rows returned:', data?.length ?? 0, 'error:', error?.message);
-  if (error) throw new Error('Błąd pobierania danych: ' + error.message);
-  if (!data || data.length === 0)
+  if (epError) throw new Error('Błąd pobierania danych: ' + epError.message);
+
+  const rows: any[] = [...(epData ?? [])];
+
+  // Add delivery rows that have no matching einsatzplan entry
+  for (const d of (delData ?? []) as any[]) {
+    const date = d.delivery_time?.split('T')[0];
+    if (!date) continue;
+    const siteName = Array.isArray(d.construction_sites) ? d.construction_sites[0]?.name : d.construction_sites?.name;
+    const siteAddr = Array.isArray(d.construction_sites) ? d.construction_sites[0]?.address : d.construction_sites?.address;
+    const alreadyInEp = rows.some(r => r.date === date && r.construction_sites?.name === siteName);
+    if (!alreadyInEp) {
+      const { kw, year } = getISOWeek(new Date(date));
+      rows.push({
+        date,
+        kw,
+        year,
+        mischgut: null,
+        tonnen_plan: null,
+        tonnen_real: d.tons ? Number(d.tons) : null,
+        construction_sites: { name: siteName ?? null, address: siteAddr ?? null },
+      });
+    }
+  }
+
+  console.log('[PDF] rows total:', rows.length);
+  if (rows.length === 0)
     throw new Error('Brak danych dla wybranego zakresu.');
 
   // Group by week
@@ -211,7 +240,7 @@ export async function generateEinsatzplanPdf(
     { kw: number; year: number; days: Record<string, any[]> }
   > = {};
 
-  for (const row of data as any[]) {
+  for (const row of rows) {
     const key = `${row.year}-${String(row.kw).padStart(2, '0')}`;
     if (!byWeek[key])
       byWeek[key] = { kw: row.kw, year: row.year, days: {} };
